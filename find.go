@@ -6,11 +6,11 @@ import (
 )
 
 
-type MongoResultSet struct {
+type ResultSet struct {
 	Query *mgo.Query
 	Iter *mgo.Iter
 	loadedIter bool
-	Connection *MongoConnection
+	Connection *Connection
 }
 
 type PaginationInfo struct {
@@ -20,7 +20,7 @@ type PaginationInfo struct {
 	TotalRecords int
 }
 
-func (r *MongoResultSet) Next(mod interface{}) bool {
+func (r *ResultSet) Next(mod interface{}) bool {
 	colname := getCollectionName(mod)
 	returnMap := make(map[string]interface{})
 
@@ -41,7 +41,7 @@ func (r *MongoResultSet) Next(mod interface{}) bool {
 
 
 
-func (r *MongoResultSet) Free() error {
+func (r *ResultSet) Free() error {
 	if r.loadedIter {
 		if err := r.Iter.Close(); err != nil {
 		    return err
@@ -52,7 +52,7 @@ func (r *MongoResultSet) Free() error {
 }
 
 // Set skip + limit on the current query and generates a PaginationInfo struct with info for your front end
-func (r *MongoResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
+func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 
 	info := new(PaginationInfo)
 
@@ -85,12 +85,12 @@ func (r *MongoResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 }
 
 // Pass in the sample just so we can get the collection name
-func (c *MongoConnection) Find(query interface{}, sample interface{}) *MongoResultSet {
+func (c *Connection) Find(query interface{}, sample interface{}) *ResultSet {
 	colname := getCollectionName(sample)
 
 	q := c.Collection(colname).Find(query)
 
-	resultset := new(MongoResultSet)
+	resultset := new(ResultSet)
 
 	resultset.Query = q
 	resultset.Connection = c

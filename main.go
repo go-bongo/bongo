@@ -6,28 +6,30 @@ import (
 	"github.com/oleiade/reflections"
 	"reflect"
 	"log"
+	"errors"
+	// "fmt"
 	// "math"
 	// "strings"
 )
 
 
-type MongoConfig struct {
+type Config struct {
 	ConnectionString string
 	Database string
 	EncryptionKey string
 	EncryptionKeyPerCollection map[string]string
 }
 
-type MongoConnection struct {
-	Config *MongoConfig
+type Connection struct {
+	Config *Config
 	Session *mgo.Session
 }
 
 
 
 // Create a new connection and run Connect()
-func Connect(config *MongoConfig) *MongoConnection {
-	conn := &MongoConnection{
+func Connect(config *Config) *Connection {
+	conn := &Connection{
 		Config:config,
 	}
 
@@ -37,7 +39,7 @@ func Connect(config *MongoConfig) *MongoConnection {
 }
 
 // Connect to the database using the provided config
-func (m *MongoConnection) Connect() {
+func (m *Connection) Connect() {
 	session, err := mgo.Dial(m.Config.ConnectionString)
 
 	if err != nil {
@@ -47,12 +49,12 @@ func (m *MongoConnection) Connect() {
 	m.Session = session
 }
 
-// Convenience for retrieving a collection by name based on the config passed to the MongoConnection
-func (m *MongoConnection) Collection(name string) *mgo.Collection {
+// Convenience for retrieving a collection by name based on the config passed to the Connection
+func (m *Connection) Collection(name string) *mgo.Collection {
 	return m.Session.DB(m.Config.Database).C(name)
 }
 
-func (m *MongoConnection) GetEncryptionKey(collection string) []byte {
+func (m *Connection) GetEncryptionKey(collection string) []byte {
 	key, has := m.Config.EncryptionKeyPerCollection[collection]
 
 	if has {
@@ -78,7 +80,7 @@ func ensureIdField(mod interface{}) {
 
 
 // Save a document. Collection name is interpreted from name of struct
-func (c *MongoConnection) Save(mod interface{}) (error) {
+func (c *Connection) Save(mod interface{}) (error, []string) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Fatal("Failed to save:\n", r)
@@ -109,6 +111,17 @@ func (c *MongoConnection) Save(mod interface{}) (error) {
 		isNew = true
 	}
 
+	// Validate?
+	if _, ok := mod.(interface{Validate()[]string}); ok {
+		results := reflect.ValueOf(mod).MethodByName("Validate").Call([]reflect.Value{})
+		if errs, ok := results[0].Interface().([]string); ok {
+			if len(errs) > 0 {
+				err := errors.New("Validation failed")
+				return err, errs
+			}
+		}
+	}
+
 	if isNew {
 		if hook, ok := mod.(interface{BeforeCreate()}); ok { 
 			hook.BeforeCreate() 
@@ -127,11 +140,11 @@ func (c *MongoConnection) Save(mod interface{}) (error) {
 
 	_, err =  c.Collection(colname).UpsertId(modelMap["_id"], modelMap)
 
-	return err
+	return err, nil
 }
 
 // Find a document by ID. Collection name is interpreted from name of struct
-func (c *MongoConnection) FindById(id bson.ObjectId, mod interface{}) (error) {
+func (c *Connection) FindById(id bson.ObjectId, mod interface{}) (error) {
 	returnMap := make(map[string]interface{})
 
 	colname := getCollectionName(mod)
@@ -151,7 +164,7 @@ func (c *MongoConnection) FindById(id bson.ObjectId, mod interface{}) (error) {
 }
 
 // Delete a document. Collection name is interpreted from name of struct
-func (c *MongoConnection) Delete(mod interface{}) error {
+func (c *Connection) Delete(mod interface{}) error {
 	ensureIdField(mod)
 	f, err := reflections.GetField(mod, "Id")
 	if err != nil {

@@ -43,7 +43,7 @@ func (s *TestSuite) TestValidateMongoIdRef(c *C) {
 	message.Count = 5
 
 
-	err := connection.Save(message)
+	err, _ := connection.Save(message)
 
 	c.Assert(err, Equals, nil)
 	c.Assert(ValidateMongoIdRef(message.Id, connection.Collection("foo_bar")), Equals, true)

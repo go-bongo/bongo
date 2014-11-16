@@ -22,7 +22,7 @@ func (s *TestSuite) TestFind(c *C) {
 	message.Count = 5
 
 
-	err := connection.Save(message)
+	err, _ := connection.Save(message)
 
 	c.Assert(err, Equals, nil)
 
@@ -30,7 +30,7 @@ func (s *TestSuite) TestFind(c *C) {
 	message2.Msg = "Bar"
 	message2.Count = 10
 
-	err = connection.Save(message2)
+	err, _ = connection.Save(message2)
 
 	c.Assert(err, Equals, nil)
 	
@@ -53,7 +53,7 @@ func (s *TestSuite) TestFind(c *C) {
 	c.Assert(count, Equals, 2)
 	
 
-	connection.Session.DB(config.Database).DropDatabase()
+	// connection.Session.DB(config.Database).DropDatabase()
 }
 
 func (s *TestSuite) TestFindWithPagination(c *C) {
@@ -69,7 +69,7 @@ func (s *TestSuite) TestFindWithPagination(c *C) {
 	message.Count = 5
 
 
-	err := connection.Save(message)
+	err, _ := connection.Save(message)
 
 	c.Assert(err, Equals, nil)
 
@@ -77,7 +77,7 @@ func (s *TestSuite) TestFindWithPagination(c *C) {
 	message2.Msg = "Bar"
 	message2.Count = 10
 
-	err = connection.Save(message2)
+	err, _ = connection.Save(message2)
 
 	c.Assert(err, Equals, nil)
 	
@@ -114,7 +114,7 @@ func (s *TestSuite) TestFindWithPagination(c *C) {
 	c.Assert(count2, Equals, 1)
 	
 
-	connection.Session.DB(config.Database).DropDatabase()
+	// connection.Session.DB(config.Database).DropDatabase()
 }
 
 
