@@ -6,6 +6,7 @@ import (
 	"github.com/oleiade/reflections"
 	"reflect"
 	"log"
+	// "math"
 	// "strings"
 )
 
@@ -21,6 +22,8 @@ type MongoConnection struct {
 	Config *MongoConfig
 	Session *mgo.Session
 }
+
+
 
 // Create a new connection and run Connect()
 func Connect(config *MongoConfig) *MongoConnection {
@@ -137,7 +140,7 @@ func (c *MongoConnection) FindById(id bson.ObjectId, mod interface{}) (error) {
 		return err
 	}
 
-	// Decrypt
+	// Decrypt + Marshal into map
 	
 	DecryptDocument(c.GetEncryptionKey(colname), returnMap, mod)
 
@@ -148,7 +151,7 @@ func (c *MongoConnection) FindById(id bson.ObjectId, mod interface{}) (error) {
 }
 
 // Delete a document. Collection name is interpreted from name of struct
-func (c *MongoConnection) Delete(mod interface{}) (error) {
+func (c *MongoConnection) Delete(mod interface{}) error {
 	ensureIdField(mod)
 	f, err := reflections.GetField(mod, "Id")
 	if err != nil {
@@ -159,6 +162,7 @@ func (c *MongoConnection) Delete(mod interface{}) (error) {
 
 	return c.Collection(colname).Remove(bson.M{"_id": id})
 }
+
 
 
 
