@@ -3,7 +3,7 @@ package frat
 import (
 	"testing"
 	. "gopkg.in/check.v1"
-	// "labix.org/v2/mgo/bson"
+	"labix.org/v2/mgo/bson"
 )
 
 
@@ -16,6 +16,7 @@ type DocumentTestSuite struct{}
 var _ = Suite(&DocumentTestSuite{})
 
 type msg struct {
+	Id    bson.ObjectId   `bson:"_id"`
 	Msg   string        `encrypted:"true",bson="msg"`
 	Count int           `encrypted:"true",bson="count"`
 }
@@ -37,13 +38,11 @@ func (s *DocumentTestSuite) TestDocument(c *C) {
 	message.Msg = "Foo"
 	message.Count = 5
 
-	myDoc := &Document{
+	myDoc := &Collection{
 		Collection:connection.Collection("message"),
-		Connection:connection,
-		Model:message,
 	}
 
-	err := myDoc.Save()
+	err := myDoc.Save(message)
 
 	c.Assert(err, Equals, nil)
 

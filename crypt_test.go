@@ -26,7 +26,6 @@ type Name struct {
 }
 
 type Person struct {
-	Document
 	Name `encrypted:"true"`
 	Phone string
 	Number int `encrypted:"true" bson:"Foo"`
