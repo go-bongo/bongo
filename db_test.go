@@ -1,7 +1,7 @@
 package frat
 
 import (
-	// "testing"
+	"testing"
 	. "gopkg.in/check.v1"
 	"labix.org/v2/mgo/bson"
 )
@@ -39,6 +39,8 @@ func (s *TestSuite) TestConnect(c *C) {
 	err := connection.Session.Ping()
 
 	c.Assert(err, Equals, nil)
+
+	connection.Session.DB(config.Database).DropDatabase()
 }
 
 func (s *TestSuite) TestSaveAndFind(c *C) {
@@ -67,6 +69,7 @@ func (s *TestSuite) TestSaveAndFind(c *C) {
 	c.Assert(newMessage.Id.String(), Equals, message.Id.String())
 	c.Assert(newMessage.Msg, Equals, message.Msg)
 	c.Assert(newMessage.Count, Equals, message.Count)
+	connection.Session.DB(config.Database).DropDatabase()
 }
 
 func (s *TestSuite) TestFindNonExistent(c *C) {
@@ -82,6 +85,7 @@ func (s *TestSuite) TestFindNonExistent(c *C) {
 	err := connection.FindById(bson.NewObjectId(), newMessage)
 
 	c.Assert(err.Error(), Equals, "not found")
+	connection.Session.DB(config.Database).DropDatabase()
 }
 
 func (s *TestSuite) TestDelete(c *C) {
@@ -108,5 +112,40 @@ func (s *TestSuite) TestDelete(c *C) {
 	err = connection.FindById(message.Id, newMessage)
 	c.Assert(err.Error(), Equals, "not found")
 	// Make sure the ids are the same
+	// 
+	connection.Session.DB(config.Database).DropDatabase()
 
+}
+
+
+/////////////////////
+/// BENCHMARKS
+/////////////////////
+func createAndSaveDocument(conn *MongoConnection) {
+ 	message := &FooBar{
+ 		Msg:"Foo",
+ 		Count:5,
+ 	}
+
+ 	err := conn.Save(message)
+ 	if err != nil {
+ 		panic(err)
+ 	}
+}
+
+
+func BenchmarkEncryptedAndSave(b *testing.B) {
+	config := &MongoConfig{"localhost","gotest"}
+
+	connection := Connect(config)
+
+
+	defer connection.Session.Close()
+
+
+
+	for i := 0; i < b.N; i++ {
+	    createAndSaveDocument(connection)
+	}
+	connection.Session.DB(config.Database).DropDatabase()
 }
