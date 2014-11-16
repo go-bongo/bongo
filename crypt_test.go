@@ -20,10 +20,6 @@ var key = []byte("asdf1234asdf1234")
 /**
  * Full document encryption
  */
-type Document struct {
-
-}
-
 type Name struct {
 	First string
 	Last string

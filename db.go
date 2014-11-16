@@ -1,4 +1,4 @@
-package db
+package frat
 
 import (
 	"labix.org/v2/mgo"
@@ -28,6 +28,6 @@ func (m *MongoConnection) Connect() {
 	m.Session = session
 }
 
-func (m *MongoConnection) Collection(name string) *Collection {
-	return &Collection{m.Session.DB(m.Config.Database).C(name)}
+func (m *MongoConnection) Collection(name string) *mgo.Collection {
+	return m.Session.DB(m.Config.Database).C(name)
 }

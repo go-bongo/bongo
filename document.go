@@ -1,10 +1,10 @@
-package db
+package frat
 
 import (
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	"maxwellhealth/common/crypt"
-	"github.com/oleiade/reflections"
+	// "github.com/oleiade/reflections"
 	"fmt"
 )
 type Document struct {
@@ -14,26 +14,22 @@ type Document struct {
 	Collection *mgo.Collection
 }
 
-var key = []byte("asdf1234asdf1234")
+// var key = []byte("asdf1234asdf1234")
 
 
 // Save a document
 func (d *Document) Save() (error) {
 
 	// 1) If there's no ID, create a new one
-
-	
 	if !d.Id.Valid() {
 		fmt.Println("Creating new ID")
-		d.Id := bson.NewObjectId()
+		d.Id = bson.NewObjectId()
 	}
 	
-
-
 	// 2) Convert the model into a map using the crypt library
 	modelMap := crypt.EncryptDocument(key, d.Model)
 	modelMap["_id"] = d.Id
-	err =  d.Collection.Insert(modelMap)
+	err :=  d.Collection.Insert(modelMap)
 
 	return err
 }
