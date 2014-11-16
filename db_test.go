@@ -44,11 +44,8 @@ func (s *TestSuite) TestConnect(c *C) {
 func (s *TestSuite) TestSaveAndFind(c *C) {
 	config := &MongoConfig{"localhost","gotest"}
 
-	connection := new(MongoConnection)
+	connection := Connect(config)
 
-	connection.Config = config
-
-	connection.Connect()
 
 	defer connection.Session.Close()
 
@@ -75,11 +72,8 @@ func (s *TestSuite) TestSaveAndFind(c *C) {
 func (s *TestSuite) TestFindNonExistent(c *C) {
 	config := &MongoConfig{"localhost","gotest"}
 
-	connection := new(MongoConnection)
+	connection := Connect(config)
 
-	connection.Config = config
-
-	connection.Connect()
 
 	defer connection.Session.Close()
 
@@ -93,11 +87,8 @@ func (s *TestSuite) TestFindNonExistent(c *C) {
 func (s *TestSuite) TestDelete(c *C) {
 	config := &MongoConfig{"localhost","gotest"}
 
-	connection := new(MongoConnection)
+	connection := Connect(config)
 
-	connection.Config = config
-
-	connection.Connect()
 
 	defer connection.Session.Close()
 

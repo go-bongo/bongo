@@ -14,12 +14,23 @@ type MongoConfig struct {
 	Database string
 }
 
-
 type MongoConnection struct {
 	Config *MongoConfig
 	Session *mgo.Session
 }
 
+// Create a new connection and run Connect()
+func Connect(config *MongoConfig) *MongoConnection {
+	conn := &MongoConnection{
+		Config:config,
+	}
+
+	conn.Connect()
+
+	return conn
+}
+
+// Connect to the database using the provided config
 func (m *MongoConnection) Connect() {
 	session, err := mgo.Dial(m.Config.ConnectionString)
 
@@ -30,14 +41,17 @@ func (m *MongoConnection) Connect() {
 	m.Session = session
 }
 
+// Convenience for retrieving a collection by name based on the config passed to the MongoConnection
 func (m *MongoConnection) Collection(name string) *mgo.Collection {
 	return m.Session.DB(m.Config.Database).C(name)
 }
 
+// Get the collection name from an arbitrary interface. Returns type name in snake case
 func getCollectionName(mod interface{}) (string) {
 	return ToSnake(reflect.Indirect(reflect.ValueOf(mod)).Type().Name())
 }
 
+// Ensure that a particular interface has an "Id" field. Panic if not
 func ensureIdField(mod interface{}) {
 	has, _ := reflections.HasField(mod, "Id")
 	if !has {
@@ -45,7 +59,7 @@ func ensureIdField(mod interface{}) {
 	}
 }
 
-
+// Save a document. Collection name is interpreted from name of struct
 func (c *MongoConnection) Save(mod interface{}) (error) {
 
 
@@ -69,13 +83,14 @@ func (c *MongoConnection) Save(mod interface{}) (error) {
 		}
 	}
 	
-	// 2) Convert the model into a map using the crypt library
+	// 3) Convert the model into a map using the crypt library
 	modelMap := EncryptDocument(key, mod)
 	err =  c.Collection(getCollectionName(mod)).Insert(modelMap)
 
 	return nil
 }
 
+// Find a document by ID. Collection name is interpreted from name of struct
 func (c *MongoConnection) FindById(id bson.ObjectId, mod interface{}) (error) {
 	returnMap := make(map[string]interface{})
 
@@ -90,6 +105,7 @@ func (c *MongoConnection) FindById(id bson.ObjectId, mod interface{}) (error) {
 	return nil
 }
 
+// Delete a document. Collection name is interpreted from name of struct
 func (c *MongoConnection) Delete(mod interface{}) (error) {
 	ensureIdField(mod)
 	f, err := reflections.GetField(mod, "Id")
