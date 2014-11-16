@@ -40,7 +40,7 @@ func (s *TestSuite) TestConnect(c *C) {
 	c.Assert(err, Equals, nil)
 }
 
-func (s *TestSuite) TestSave(c *C) {
+func (s *TestSuite) TestSaveAndFind(c *C) {
 	config := &MongoConfig{"localhost","gotest"}
 
 	connection := new(MongoConnection)
@@ -60,6 +60,15 @@ func (s *TestSuite) TestSave(c *C) {
 	err := connection.Save(message)
 
 	c.Assert(err, Equals, nil)
+
+	newMessage := new(FooBar)
+
+	connection.FindById(message.Id, newMessage)
+
+	// Make sure the ids are the same
+	c.Assert(newMessage.Id.String(), Equals, message.Id.String())
+	c.Assert(newMessage.Msg, Equals, message.Msg)
+	c.Assert(newMessage.Count, Equals, message.Count)
 }
 
 
