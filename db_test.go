@@ -25,9 +25,15 @@ type FooBar struct {
 	Count int           `encrypted:"true",bson="count"`
 }
 
+var config = &MongoConfig{
+	ConnectionString:"localhost",
+	Database:"gotest",
+	EncryptionKey:"asdf1234asdf1234",
+}
+
 
 func (s *TestSuite) TestConnect(c *C) {
-	config := &MongoConfig{"localhost","gotest"}
+	
 
 	connection := new(MongoConnection)
 
@@ -44,7 +50,6 @@ func (s *TestSuite) TestConnect(c *C) {
 }
 
 func (s *TestSuite) TestSaveAndFind(c *C) {
-	config := &MongoConfig{"localhost","gotest"}
 
 	connection := Connect(config)
 
@@ -73,7 +78,6 @@ func (s *TestSuite) TestSaveAndFind(c *C) {
 }
 
 func (s *TestSuite) TestFindNonExistent(c *C) {
-	config := &MongoConfig{"localhost","gotest"}
 
 	connection := Connect(config)
 
@@ -89,7 +93,6 @@ func (s *TestSuite) TestFindNonExistent(c *C) {
 }
 
 func (s *TestSuite) TestDelete(c *C) {
-	config := &MongoConfig{"localhost","gotest"}
 
 	connection := Connect(config)
 
@@ -135,7 +138,6 @@ func createAndSaveDocument(conn *MongoConnection) {
 
 
 func BenchmarkEncryptedAndSave(b *testing.B) {
-	config := &MongoConfig{"localhost","gotest"}
 
 	connection := Connect(config)
 

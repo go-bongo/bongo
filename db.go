@@ -12,6 +12,8 @@ import (
 type MongoConfig struct {
 	ConnectionString string
 	Database string
+	EncryptionKey string
+	EncryptionKeyPerCollection map[string]string
 }
 
 type MongoConnection struct {
@@ -46,6 +48,17 @@ func (m *MongoConnection) Collection(name string) *mgo.Collection {
 	return m.Session.DB(m.Config.Database).C(name)
 }
 
+func (m *MongoConnection) GetEncryptionKey(collection string) []byte {
+	key, has := m.Config.EncryptionKeyPerCollection[collection]
+
+	if has {
+		return []byte(key)
+	} else {
+		return []byte(m.Config.EncryptionKey)
+	}
+
+}
+
 // Get the collection name from an arbitrary interface. Returns type name in snake case
 func getCollectionName(mod interface{}) (string) {
 	return ToSnake(reflect.Indirect(reflect.ValueOf(mod)).Type().Name())
@@ -58,6 +71,7 @@ func ensureIdField(mod interface{}) {
 		panic("Failed to save - model must have Id field")
 	}
 }
+
 
 // Save a document. Collection name is interpreted from name of struct
 func (c *MongoConnection) Save(mod interface{}) (error) {
@@ -83,9 +97,10 @@ func (c *MongoConnection) Save(mod interface{}) (error) {
 		}
 	}
 	
+	colname := getCollectionName(mod)
 	// 3) Convert the model into a map using the crypt library
-	modelMap := EncryptDocument(key, mod)
-	err =  c.Collection(getCollectionName(mod)).Insert(modelMap)
+	modelMap := EncryptDocument(c.GetEncryptionKey(colname), mod)
+	err =  c.Collection(colname).Insert(modelMap)
 
 	return nil
 }
@@ -94,13 +109,15 @@ func (c *MongoConnection) Save(mod interface{}) (error) {
 func (c *MongoConnection) FindById(id bson.ObjectId, mod interface{}) (error) {
 	returnMap := make(map[string]interface{})
 
-	err := c.Collection(getCollectionName(mod)).FindId(id).One(&returnMap)
+	colname := getCollectionName(mod)
+	err := c.Collection(colname).FindId(id).One(&returnMap)
 	if err != nil {
 		return err
 	}
 
 	// Decrypt
-	DecryptDocument(key, returnMap, mod)
+	
+	DecryptDocument(c.GetEncryptionKey(colname), returnMap, mod)
 
 	return nil
 }
@@ -113,7 +130,9 @@ func (c *MongoConnection) Delete(mod interface{}) (error) {
 		return err
 	}
 	id := f.(bson.ObjectId)
-	return c.Collection(getCollectionName(mod)).Remove(bson.M{"_id": id})
+	colname := getCollectionName(mod)
+
+	return c.Collection(colname).Remove(bson.M{"_id": id})
 }
 
 
