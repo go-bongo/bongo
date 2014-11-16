@@ -7,6 +7,7 @@ import (
 )
 
 
+
 // var key = []byte("asdf1234asdf1234")
 
 
@@ -71,5 +72,50 @@ func (s *TestSuite) TestSaveAndFind(c *C) {
 	c.Assert(newMessage.Count, Equals, message.Count)
 }
 
+func (s *TestSuite) TestFindNonExistent(c *C) {
+	config := &MongoConfig{"localhost","gotest"}
+
+	connection := new(MongoConnection)
+
+	connection.Config = config
+
+	connection.Connect()
+
+	defer connection.Session.Close()
+
+	newMessage := new(FooBar)
+
+	err := connection.FindById(bson.NewObjectId(), newMessage)
+
+	c.Assert(err.Error(), Equals, "not found")
+}
+
+func (s *TestSuite) TestDelete(c *C) {
+	config := &MongoConfig{"localhost","gotest"}
+
+	connection := new(MongoConnection)
+
+	connection.Config = config
+
+	connection.Connect()
+
+	defer connection.Session.Close()
+
+	// This needs to always be a pointer, otherwise the encryption component won't like it.
+	message := new(FooBar)
+	message.Msg = "Foo"
+	message.Count = 5
 
 
+	err := connection.Save(message)
+
+	c.Assert(err, Equals, nil)
+
+	connection.Delete(message)
+
+	newMessage := new(FooBar)
+	err = connection.FindById(message.Id, newMessage)
+	c.Assert(err.Error(), Equals, "not found")
+	// Make sure the ids are the same
+
+}

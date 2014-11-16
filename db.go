@@ -90,5 +90,15 @@ func (c *MongoConnection) FindById(id bson.ObjectId, mod interface{}) (error) {
 	return nil
 }
 
+func (c *MongoConnection) Delete(mod interface{}) (error) {
+	ensureIdField(mod)
+	f, err := reflections.GetField(mod, "Id")
+	if err != nil {
+		return err
+	}
+	id := f.(bson.ObjectId)
+	return c.Collection(getCollectionName(mod)).Remove(bson.M{"_id": id})
+}
+
 
 
