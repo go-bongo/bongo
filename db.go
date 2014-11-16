@@ -5,6 +5,7 @@ import (
 	"labix.org/v2/mgo/bson"
 	"github.com/oleiade/reflections"
 	"reflect"
+	"log"
 	// "strings"
 )
 
@@ -75,7 +76,11 @@ func ensureIdField(mod interface{}) {
 
 // Save a document. Collection name is interpreted from name of struct
 func (c *MongoConnection) Save(mod interface{}) (error) {
-
+	defer func() {
+		if r := recover(); r != nil {
+			log.Fatal("Failed to save:\n", r)
+		}
+	}()
 
 	// 1) Make sure mod has an Id field
 	ensureIdField(mod)
@@ -87,22 +92,39 @@ func (c *MongoConnection) Save(mod interface{}) (error) {
 	if err != nil {
 		panic(err)
 	}
+
+	isNew := false
 	
 	if !id.Valid() {
 		id := bson.NewObjectId()
-		err := reflections.SetField(mod, "Id", id)  // err != nil
+		err := reflections.SetField(mod, "Id", id)
 
 		if err != nil {
 			panic(err)
 		}
+
+		isNew = true
 	}
+
+	if isNew {
+		if hook, ok := mod.(interface{BeforeCreate()}); ok { 
+			hook.BeforeCreate() 
+		} 
+	} else if hook, ok := mod.(interface{BeforeUpdate()}); ok { 
+		hook.BeforeUpdate() 
+	}
+
+	if hook, ok := mod.(interface{BeforeSave()}); ok { 
+		hook.BeforeSave() 
+	} 
 	
 	colname := getCollectionName(mod)
 	// 3) Convert the model into a map using the crypt library
 	modelMap := EncryptDocument(c.GetEncryptionKey(colname), mod)
-	err =  c.Collection(colname).Insert(modelMap)
 
-	return nil
+	_, err =  c.Collection(colname).UpsertId(modelMap["_id"], modelMap)
+
+	return err
 }
 
 // Find a document by ID. Collection name is interpreted from name of struct
@@ -119,6 +141,9 @@ func (c *MongoConnection) FindById(id bson.ObjectId, mod interface{}) (error) {
 	
 	DecryptDocument(c.GetEncryptionKey(colname), returnMap, mod)
 
+	if hook, ok := mod.(interface{AfterFind()}); ok { 
+		hook.AfterFind() 
+	}
 	return nil
 }
 

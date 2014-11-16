@@ -25,6 +25,23 @@ type FooBar struct {
 	Count int           `encrypted:"true",bson="count"`
 }
 
+// Add some hooks
+func (f *FooBar) BeforeSave() {
+	f.Count++
+}
+
+func (f *FooBar) BeforeCreate() {
+	f.Count++
+}
+
+func (f *FooBar) BeforeUpdate() {
+	f.Count = f.Count + 2
+}
+
+func (f *FooBar) AfterFind() {
+	f.Count = f.Count + 5
+}
+
 var config = &MongoConfig{
 	ConnectionString:"localhost",
 	Database:"gotest",
@@ -49,7 +66,7 @@ func (s *TestSuite) TestConnect(c *C) {
 	connection.Session.DB(config.Database).DropDatabase()
 }
 
-func (s *TestSuite) TestSaveAndFind(c *C) {
+func (s *TestSuite) TestSaveAndFindWithHooks(c *C) {
 
 	connection := Connect(config)
 
@@ -73,7 +90,17 @@ func (s *TestSuite) TestSaveAndFind(c *C) {
 	// Make sure the ids are the same
 	c.Assert(newMessage.Id.String(), Equals, message.Id.String())
 	c.Assert(newMessage.Msg, Equals, message.Msg)
-	c.Assert(newMessage.Count, Equals, message.Count)
+
+	// Testing the hook here - it should have run and +1 on BeforeSave and +1 on BeforeCreate and +5 on AfterFind
+	c.Assert(newMessage.Count, Equals, 12)
+
+	// Saving it again should run +1 on BeforeSave and +2 on BeforeUpdate
+	err = connection.Save(message)
+
+	c.Assert(err, Equals, nil)
+	c.Assert(message.Count, Equals, 10)
+
+
 	connection.Session.DB(config.Database).DropDatabase()
 }
 
