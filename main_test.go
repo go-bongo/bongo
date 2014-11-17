@@ -8,16 +8,6 @@ import (
 
 
 
-// var key = []byte("asdf1234asdf1234")
-
-
-// Hook up gocheck into the "go test" runner.
-// func Test(t *testing.T) { TestingT(t) }
-
-// type TestSuite struct{}
-
-var _ = Suite(&TestSuite{})
-
 type Child struct {
 	Foo string
 	BazBing string `bson:"bazBing"`
