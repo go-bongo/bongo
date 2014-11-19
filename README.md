@@ -43,6 +43,7 @@ For example:
 ```go
 
 type Person struct {
+	Id bson.ObjectId `bson:"_id"`
 	FirstName string `encrypted:"true" bson:"firstName"`
 	LastName string `encrypted:"true" bson:"lastName"`
 	Gender string
@@ -61,6 +62,7 @@ type Address struct {
 }
 
 type Person struct {
+	Id bson.ObjectId `bson:"_id"`
 	FirstName string `encrypted:"true" bson:"firstName"`
 	LastName string `encrypted:"true" bson:"lastName"`
 	Gender string
