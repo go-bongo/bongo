@@ -83,6 +83,7 @@ func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 
 // Pass in the sample just so we can get the collection name
 func (c *Connection) Find(query interface{}, collection interface{}) *ResultSet {
+
 	// If collection is a string, assume that's the collection name
 	var colname string
 	if str, ok := collection.(string); ok {
