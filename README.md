@@ -8,6 +8,10 @@ We couldn't find a good ODM for MongoDB written in Go, so we made one. Bongo is 
 
 `import "github.com/maxwellhealth/bongo"`
 
+And install dependencies:
+
+`cd $GOHOME/src/github.com/maxwellhealth/bongo && go get .`
+
 ## Connect to a Database
 
 Create a new `bongo.Config` instance:
