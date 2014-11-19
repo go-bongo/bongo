@@ -1,4 +1,4 @@
-// Two-way encryption for all Maxwell components
+// Two-way encryption
 // @author Jason Raede <jason@maxwellhealth.com>
 
 package bongo
