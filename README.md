@@ -86,4 +86,96 @@ You can obviously use your own validation as long as you add elements to the ret
 
 ## Saving Models
 
-Coming soon... (check the tests in the meantime)
+Bongo can intelligently guess the name of the collection using the name of the struct you pass. (e.g. "FooBar" would go in as "foo_bar"). If you're OK with that, you can save directly via your connection:
+
+```go
+myPerson := &Person{
+	FirstName:"Testy",
+	LastName:"McGee",
+	Gender:"male",
+}
+err, validationErrs := connection.Save(myPerson)
+```
+
+You will now have a new document in the `person` collection.
+
+To insert this into a collection called "people", you can do the following:
+
+```go
+myPerson := &Person{
+	FirstName:"Testy",
+	LastName:"McGee",
+	Gender:"male",
+}
+err, validationErrs := connection.Collection("people").Save(myPerson)
+```
+
+Now you'll have a new document in the `people` collection.
+
+## Deleting Models
+
+Same deal as save.
+
+To delete from the "person" collection (assuming person is a full struct with a valid Id property):
+
+```go
+err := connection.Delete(person)
+```
+
+Or from the "people" collection (same assumption):
+```go
+err := connection.Collection("people").Delete(person)
+```
+
+
+## Find by ID
+
+Same thing applies re: collection name. This will look in "person" and populate the reference of `person`:
+
+```go
+import "labix.org/v2/mgo/bson"
+
+person := new(Person)
+
+err := connection.FindById(bson.ObjectIdHex(StringId), person)
+```
+
+And this will look in "people":
+
+```go
+import "labix.org/v2/mgo/bson"
+
+person := new(Person)
+
+err := connection.Collection("people").FindById(bson.ObjectIdHex(StringId), person)
+```
+
+## Find
+
+Find's a bit different - it's not a direct operation on a model reference so you call it directly via the `Connection`. We may change this in the future but this is how it works currently:
+
+```go
+
+// *bongo.ResultSet
+results := connection.Find(nil, "people")
+
+person := new(Person)
+
+count := 0
+
+for results.Next(person) {
+	fmt.Println(person.FirstName)
+}
+```
+
+You can also pass a sample reference as the second argument instead of a string. This will look in the "person" collection instead of "people":
+
+```go
+results := connection.Find(nil, &Person{})
+```
+
+To paginate, you can run `Paginate(perPage int, currentPage int)` on the result of `connection.Find()`.
+
+To use additional functions like `sort`, you can access the underlying mgo `Query` via `ResultSet.Query`.
+
+
