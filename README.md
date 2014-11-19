@@ -135,6 +135,8 @@ Same thing applies re: collection name. This will look in "person" and populate 
 ```go
 import "labix.org/v2/mgo/bson"
 
+...
+
 person := new(Person)
 
 err := connection.FindById(bson.ObjectIdHex(StringId), person)
@@ -144,6 +146,8 @@ And this will look in "people":
 
 ```go
 import "labix.org/v2/mgo/bson"
+
+...
 
 person := new(Person)
 
