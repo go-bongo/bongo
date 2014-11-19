@@ -1,14 +1,9 @@
-package frat
+package bongo
 
 import (
 	. "gopkg.in/check.v1"
 	"labix.org/v2/mgo/bson"
 )
-
-
-
-
-
 
 func (s *TestSuite) TestValidateRequired(c *C) {
 	c.Assert(ValidateRequired("foo"), Equals, true)
@@ -18,8 +13,8 @@ func (s *TestSuite) TestValidateRequired(c *C) {
 }
 
 func (s *TestSuite) TestValidateInclusionIn(c *C) {
-	c.Assert(ValidateInclusionIn("foo", []string{"foo","bar","baz"}), Equals, true)
-	c.Assert(ValidateInclusionIn("bing", []string{"foo","bar","baz"}), Equals, false)
+	c.Assert(ValidateInclusionIn("foo", []string{"foo", "bar", "baz"}), Equals, true)
+	c.Assert(ValidateInclusionIn("bing", []string{"foo", "bar", "baz"}), Equals, false)
 }
 
 func (s *TestSuite) TestValidateMongoIdRef(c *C) {
@@ -30,7 +25,6 @@ func (s *TestSuite) TestValidateMongoIdRef(c *C) {
 	message := new(FooBar)
 	message.Msg = "Foo"
 	message.Count = 5
-
 
 	err, _ := connection.Save(message)
 

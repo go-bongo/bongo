@@ -1,16 +1,60 @@
-package frat
+package bongo
 
 import (
-	"testing"
 	. "gopkg.in/check.v1"
+	"labix.org/v2/mgo/bson"
+	"testing"
 )
 
 // Hook up gocheck into the "go test" runner.
 func Test(t *testing.T) { TestingT(t) }
-
 
 type TestSuite struct{}
 
 var _ = Suite(&TestSuite{})
 
 var key = []byte("asdf1234asdf1234")
+
+type Child struct {
+	Foo     string
+	BazBing string `bson:"bazBing"`
+}
+
+type FooBar struct {
+	Id    bson.ObjectId `bson:"_id"`
+	Msg   string        `encrypted:"true",bson="msg"`
+	Count int           `encrypted:"true",bson="count"`
+	Child *Child
+}
+
+func (f *FooBar) Validate() []string {
+	errs := []string{}
+	if f.Count == 3 {
+		errs = append(errs, "count cannot be 3")
+	}
+
+	return errs
+}
+
+// Add some hooks
+func (f *FooBar) BeforeSave() {
+	f.Count++
+}
+
+func (f *FooBar) BeforeCreate() {
+	f.Count++
+}
+
+func (f *FooBar) BeforeUpdate() {
+	f.Count = f.Count + 2
+}
+
+func (f *FooBar) AfterFind() {
+	f.Count = f.Count + 5
+}
+
+var config = &Config{
+	ConnectionString: "localhost",
+	Database:         "gotest",
+	EncryptionKey:    "asdf1234asdf1234",
+}

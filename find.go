@@ -1,22 +1,21 @@
-package frat
+package bongo
 
 import (
 	"labix.org/v2/mgo"
 	"math"
 )
 
-
 type ResultSet struct {
-	Query *mgo.Query
-	Iter *mgo.Iter
+	Query      *mgo.Query
+	Iter       *mgo.Iter
 	loadedIter bool
 	Connection *Connection
 }
 
 type PaginationInfo struct {
-	Current int
-	TotalPages int
-	PerPage int
+	Current      int
+	TotalPages   int
+	PerPage      int
 	TotalRecords int
 }
 
@@ -39,12 +38,10 @@ func (r *ResultSet) Next(mod interface{}) bool {
 	return false
 }
 
-
-
 func (r *ResultSet) Free() error {
 	if r.loadedIter {
 		if err := r.Iter.Close(); err != nil {
-		    return err
+			return err
 		}
 	}
 
@@ -64,7 +61,7 @@ func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 	}
 
 	// Calculate how many pages
-	totalPages := int(math.Ceil(float64(count)/float64(perPage)))
+	totalPages := int(math.Ceil(float64(count) / float64(perPage)))
 
 	if page < 1 {
 		page = 1
@@ -85,10 +82,16 @@ func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 }
 
 // Pass in the sample just so we can get the collection name
-func (c *Connection) Find(query interface{}, sample interface{}) *ResultSet {
-	colname := getCollectionName(sample)
+func (c *Connection) Find(query interface{}, collection interface{}) *ResultSet {
+	// If collection is a string, assume that's the collection name
+	var colname string
+	if str, ok := collection.(string); ok {
+		colname = str
+	} else {
+		colname = getCollectionName(collection)
+	}
 
-	q := c.Collection(colname).Find(query)
+	q := c.Collection(colname).Collection().Find(query)
 
 	resultset := new(ResultSet)
 

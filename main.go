@@ -1,36 +1,31 @@
-package frat
+package bongo
 
 import (
+	"github.com/oleiade/reflections"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
-	"github.com/oleiade/reflections"
 	"reflect"
-	"log"
-	"errors"
 	// "fmt"
 	// "math"
 	// "strings"
 )
 
-
 type Config struct {
-	ConnectionString string
-	Database string
-	EncryptionKey string
+	ConnectionString           string
+	Database                   string
+	EncryptionKey              string
 	EncryptionKeyPerCollection map[string]string
 }
 
 type Connection struct {
-	Config *Config
+	Config  *Config
 	Session *mgo.Session
 }
-
-
 
 // Create a new connection and run Connect()
 func Connect(config *Config) *Connection {
 	conn := &Connection{
-		Config:config,
+		Config: config,
 	}
 
 	conn.Connect()
@@ -49,11 +44,6 @@ func (m *Connection) Connect() {
 	m.Session = session
 }
 
-// Convenience for retrieving a collection by name based on the config passed to the Connection
-func (m *Connection) Collection(name string) *mgo.Collection {
-	return m.Session.DB(m.Config.Database).C(name)
-}
-
 func (m *Connection) GetEncryptionKey(collection string) []byte {
 	key, has := m.Config.EncryptionKeyPerCollection[collection]
 
@@ -65,8 +55,16 @@ func (m *Connection) GetEncryptionKey(collection string) []byte {
 
 }
 
+func (m *Connection) Collection(name string) *Collection {
+	// Just create a new instance - it's cheap and only has name
+	return &Collection{
+		Connection: m,
+		Name:       name,
+	}
+}
+
 // Get the collection name from an arbitrary interface. Returns type name in snake case
-func getCollectionName(mod interface{}) (string) {
+func getCollectionName(mod interface{}) string {
 	return ToSnake(reflect.Indirect(reflect.ValueOf(mod)).Type().Name())
 }
 
@@ -78,104 +76,21 @@ func ensureIdField(mod interface{}) {
 	}
 }
 
+// Wrappers for the collection-level methods to avoid extra typing if you want the collection name to be interpreted from the struct
+func (m *Connection) FindById(id bson.ObjectId, mod interface{}) error {
+	col := m.Collection(getCollectionName(mod))
 
-// Save a document. Collection name is interpreted from name of struct
-func (c *Connection) Save(mod interface{}) (error, []string) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Fatal("Failed to save:\n", r)
-		}
-	}()
-
-	// 1) Make sure mod has an Id field
-	ensureIdField(mod)
-
-	// 2) If there's no ID, create a new one
-	f, err := reflections.GetField(mod, "Id")
-	id := f.(bson.ObjectId)
-
-	if err != nil {
-		panic(err)
-	}
-
-	isNew := false
-	
-	if !id.Valid() {
-		id := bson.NewObjectId()
-		err := reflections.SetField(mod, "Id", id)
-
-		if err != nil {
-			panic(err)
-		}
-
-		isNew = true
-	}
-
-	// Validate?
-	if _, ok := mod.(interface{Validate()[]string}); ok {
-		results := reflect.ValueOf(mod).MethodByName("Validate").Call([]reflect.Value{})
-		if errs, ok := results[0].Interface().([]string); ok {
-			if len(errs) > 0 {
-				err := errors.New("Validation failed")
-				return err, errs
-			}
-		}
-	}
-
-	if isNew {
-		if hook, ok := mod.(interface{BeforeCreate()}); ok { 
-			hook.BeforeCreate() 
-		} 
-	} else if hook, ok := mod.(interface{BeforeUpdate()}); ok { 
-		hook.BeforeUpdate() 
-	}
-
-	if hook, ok := mod.(interface{BeforeSave()}); ok { 
-		hook.BeforeSave() 
-	} 
-	
-	colname := getCollectionName(mod)
-	// 3) Convert the model into a map using the crypt library
-	modelMap := EncryptDocument(c.GetEncryptionKey(colname), mod)
-
-	_, err =  c.Collection(colname).UpsertId(modelMap["_id"], modelMap)
-
-	return err, nil
+	return col.FindById(id, mod)
 }
 
-// Find a document by ID. Collection name is interpreted from name of struct
-func (c *Connection) FindById(id bson.ObjectId, mod interface{}) (error) {
-	returnMap := make(map[string]interface{})
+func (m *Connection) Save(mod interface{}) (error, []string) {
+	col := m.Collection(getCollectionName(mod))
 
-	colname := getCollectionName(mod)
-	err := c.Collection(colname).FindId(id).One(&returnMap)
-	if err != nil {
-		return err
-	}
-
-	// Decrypt + Marshal into map
-	
-	DecryptDocument(c.GetEncryptionKey(colname), returnMap, mod)
-
-	if hook, ok := mod.(interface{AfterFind()}); ok { 
-		hook.AfterFind() 
-	}
-	return nil
+	return col.Save(mod)
 }
 
-// Delete a document. Collection name is interpreted from name of struct
-func (c *Connection) Delete(mod interface{}) error {
-	ensureIdField(mod)
-	f, err := reflections.GetField(mod, "Id")
-	if err != nil {
-		return err
-	}
-	id := f.(bson.ObjectId)
-	colname := getCollectionName(mod)
+func (m *Connection) Delete(mod interface{}) error {
+	col := m.Collection(getCollectionName(mod))
 
-	return c.Collection(colname).Remove(bson.M{"_id": id})
+	return col.Delete(mod)
 }
-
-
-
-

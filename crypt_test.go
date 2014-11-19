@@ -1,42 +1,36 @@
-package frat
+package bongo
 
 import (
-	"testing"
 	. "gopkg.in/check.v1"
+	"testing"
 )
-
-
-
-
 
 /**
  * Full document encryption
  */
 type Name struct {
 	First string
-	Last string
+	Last  string
 }
 
 type Person struct {
-	Name `encrypted:"true"`
-	Phone string
-	Number int `encrypted:"true" bson:"Foo"`
-	Other bool `encrypted:"true""`
-	Arr []string `encrypted:"true"`
+	Name   `encrypted:"true"`
+	Phone  string
+	Number int      `encrypted:"true" bson:"Foo"`
+	Other  bool     `encrypted:"true""`
+	Arr    []string `encrypted:"true"`
 }
-
 
 func (s *TestSuite) TestEncryptDecryptDocument(c *C) {
 	p := &Person{
-		Name:Name{
-			First:"Jason",
-			Last:"Raede",
+		Name: Name{
+			First: "Jason",
+			Last:  "Raede",
 		},
-		Phone:"555-555-5555",
-		Number:5,
-		Arr:[]string{"foo","bar","baz","bing"},
+		Phone:  "555-555-5555",
+		Number: 5,
+		Arr:    []string{"foo", "bar", "baz", "bing"},
 	}
-
 
 	/**
 	 * @type map[string]interface{}
@@ -51,7 +45,6 @@ func (s *TestSuite) TestEncryptDecryptDocument(c *C) {
 	c.Assert(encrypted["Foo"], Not(Equals), 5)
 
 	c.Assert(encrypted["arr"], Not(Equals), p.Arr)
-
 
 	newP := new(Person)
 
@@ -73,7 +66,6 @@ func (s *TestSuite) TestEncryptDecryptDocument(c *C) {
 	c.Assert(newP.Arr[2], Equals, "baz")
 	c.Assert(newP.Arr[3], Equals, "bing")
 
-
 }
 
 /////////////////////
@@ -81,12 +73,12 @@ func (s *TestSuite) TestEncryptDecryptDocument(c *C) {
 /////////////////////
 func encryptDecryptDocument() {
 	p := &Person{
-		Name:Name{
-			First:"Jason",
-			Last:"Raede",
+		Name: Name{
+			First: "Jason",
+			Last:  "Raede",
 		},
-		Phone:"555-555-5555",
-		Number:5,
+		Phone:  "555-555-5555",
+		Number: 5,
 	}
 
 	encrypted := EncryptDocument(key, p)

@@ -1,5 +1,5 @@
 // Stolen from gorm.
-package frat
+package bongo
 
 import (
 	"bytes"
