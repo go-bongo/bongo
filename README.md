@@ -161,7 +161,7 @@ Find's a bit different - it's not a direct operation on a model reference so you
 ```go
 
 // *bongo.ResultSet
-results := connection.Find(nil, "people")
+results := connection.Find(bson.M{"firstName":"Bob"}, "people")
 
 person := new(Person)
 
