@@ -103,5 +103,5 @@ func (s *TestSuite) TestFindWithPagination(c *C) {
 
 	c.Assert(count2, Equals, 1)
 
-	// connection.Session.DB(config.Database).DropDatabase()
+	connection.Session.DB(config.Database).DropDatabase()
 }
