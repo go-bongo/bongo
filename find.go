@@ -32,7 +32,7 @@ func (r *ResultSet) Next(mod interface{}) bool {
 	gotResult := r.Iter.Next(returnMap)
 
 	if gotResult {
-		DecryptDocument(r.Connection.GetEncryptionKey(colname), returnMap, mod)
+		InitializeDocumentFromDB(r.Connection.GetEncryptionKey(colname), returnMap, mod)
 		return true
 	}
 	return false

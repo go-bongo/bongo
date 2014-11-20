@@ -8,13 +8,15 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
-	"errors"
-	"io"
-	"log"
-	// "labix.org/v2/mgo/bson"
 	"encoding/json"
+	"errors"
+	// "fmt"
 	"github.com/fatih/structs"
 	"github.com/mitchellh/mapstructure"
+	// "github.com/oleiade/reflections"
+	"io"
+	"labix.org/v2/mgo/bson"
+	"log"
 	"reflect"
 	"strings"
 )
@@ -68,11 +70,26 @@ func Decrypt(key []byte, encrypted string) ([]byte, error) {
 //** STRUCT-LEVEL ENCRYPTION/DECRYPTION METHODS
 
 // Encrypt a struct. Use tag `encrypted="true"` to designate fields as needing to be encrypted. Fields are encrypted by converting the properties to lowercase (assuming this is going to go into MongoDB), but you can override that using the traditional MGO tag notation (bson="otherField")
-func EncryptDocument(key []byte, doc interface{}) map[string]interface{} {
+func PrepDocumentForSave(key []byte, doc interface{}) map[string]interface{} {
+	// defer func() {
+	// 	if r := recover(); r != nil {
+	// 		// return doc
+	// 	}
+	// }()
+
 	returnMap := make(map[string]interface{})
 
-	// fmt.Println(reflect.ValueOf(doc))
-	s := reflect.ValueOf(doc).Elem()
+	v := reflect.ValueOf(doc)
+
+	var s reflect.Value
+
+	if v.Kind() == reflect.Ptr {
+		s = v.Elem()
+	} else {
+		s = v
+	}
+
+	// s := reflect.ValueOf(doc).Elem()
 	typeOfT := s.Type()
 
 	for i := 0; i < s.NumField(); i++ {
@@ -99,11 +116,25 @@ func EncryptDocument(key []byte, doc interface{}) map[string]interface{} {
 			}
 
 			returnMap[bsonName] = encrypted
-		} else if fieldName != "Document" {
+		} else {
 			if f.Kind() == reflect.Struct {
-				returnMap[bsonName] = structs.Map(f.Interface())
+				// Is it a time? Allow it through if so.
+				if string(f.Type().Name()) == "Time" {
+					returnMap[bsonName] = structs.Map(f.Interface())
+				} else {
+					// iterate
+					returnMap[bsonName] = PrepDocumentForSave(key, f.Interface())
+				}
+
+			} else if id, ok := f.Interface().(bson.ObjectId); ok {
+
+				// Skip invalid objectIds - these should be validated if they're needed, but otherwise they should just be nil
+				if id.Valid() {
+					returnMap[bsonName] = id
+				} else {
+					returnMap[bsonName] = nil
+				}
 			} else {
-				// if f.Kind() fmt.Println(f.Kind())
 				returnMap[bsonName] = f.Interface()
 			}
 		}
@@ -113,7 +144,7 @@ func EncryptDocument(key []byte, doc interface{}) map[string]interface{} {
 }
 
 // Decrypt a struct. Use tag `encrypted="true"` to designate fields as needing to be decrypted
-func DecryptDocument(key []byte, encrypted map[string]interface{}, doc interface{}) {
+func InitializeDocumentFromDB(key []byte, encrypted map[string]interface{}, doc interface{}) {
 
 	decryptedMap := make(map[string]interface{})
 

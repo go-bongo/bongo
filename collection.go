@@ -7,7 +7,6 @@ import (
 	"labix.org/v2/mgo/bson"
 	"log"
 	"reflect"
-	// "fmt"
 	// "math"
 	// "strings"
 )
@@ -50,8 +49,8 @@ func (c *Collection) Save(mod interface{}) (error, []string) {
 		}
 
 		isNew = true
-	}
 
+	}
 	// Validate?
 	if _, ok := mod.(interface {
 		Validate() []string
@@ -84,7 +83,7 @@ func (c *Collection) Save(mod interface{}) (error, []string) {
 	}
 
 	// 3) Convert the model into a map using the crypt library
-	modelMap := EncryptDocument(c.Connection.GetEncryptionKey(c.Name), mod)
+	modelMap := PrepDocumentForSave(c.Connection.GetEncryptionKey(c.Name), mod)
 
 	_, err = c.Collection().UpsertId(modelMap["_id"], modelMap)
 
@@ -101,7 +100,7 @@ func (c *Collection) FindById(id bson.ObjectId, mod interface{}) error {
 
 	// Decrypt + Marshal into map
 
-	DecryptDocument(c.Connection.GetEncryptionKey(c.Name), returnMap, mod)
+	InitializeDocumentFromDB(c.Connection.GetEncryptionKey(c.Name), returnMap, mod)
 
 	if hook, ok := mod.(interface {
 		AfterFind()

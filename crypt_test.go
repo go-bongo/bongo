@@ -21,7 +21,7 @@ type Person struct {
 	Arr    []string `encrypted:"true"`
 }
 
-func (s *TestSuite) TestEncryptDecryptDocument(c *C) {
+func (s *TestSuite) TestEncryptInitializeDocumentFromDB(c *C) {
 	p := &Person{
 		Name: Name{
 			First: "Jason",
@@ -35,7 +35,7 @@ func (s *TestSuite) TestEncryptDecryptDocument(c *C) {
 	/**
 	 * @type map[string]interface{}
 	 */
-	encrypted := EncryptDocument(key, p)
+	encrypted := PrepDocumentForSave(key, p)
 
 	// Name should be a string, encrypted from the json encoding of the Name struct
 	c.Assert(encrypted["name"], Not(Equals), "Jason")
@@ -48,7 +48,7 @@ func (s *TestSuite) TestEncryptDecryptDocument(c *C) {
 
 	newP := new(Person)
 
-	DecryptDocument(key, encrypted, newP)
+	InitializeDocumentFromDB(key, encrypted, newP)
 
 	// Encrypted structs should be converted from JSON string to the actual struct
 	c.Assert(newP.Name.First, Equals, "Jason")
@@ -71,7 +71,7 @@ func (s *TestSuite) TestEncryptDecryptDocument(c *C) {
 /////////////////////
 /// BENCHMARKS
 /////////////////////
-func encryptDecryptDocument() {
+func encryptInitializeDocumentFromDB() {
 	p := &Person{
 		Name: Name{
 			First: "Jason",
@@ -81,15 +81,15 @@ func encryptDecryptDocument() {
 		Number: 5,
 	}
 
-	encrypted := EncryptDocument(key, p)
+	encrypted := PrepDocumentForSave(key, p)
 	newP := new(Person)
 
-	DecryptDocument(key, encrypted, newP)
+	InitializeDocumentFromDB(key, encrypted, newP)
 }
 
 // Note - potential for this to be ~20% faster if on the first pass we make an array of all the encrypted strings and bson values so we don't have to introspect the tags every time for the same Type. OK for now.
-func BenchmarkEncryptDecryptDocument(b *testing.B) {
+func BenchmarkEncryptInitializeDocumentFromDB(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		encryptDecryptDocument()
+		encryptInitializeDocumentFromDB()
 	}
 }

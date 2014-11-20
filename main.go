@@ -1,6 +1,7 @@
 package bongo
 
 import (
+	// "fmt"
 	"github.com/oleiade/reflections"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
