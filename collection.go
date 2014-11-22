@@ -110,6 +110,32 @@ func (c *Collection) FindById(id bson.ObjectId, mod interface{}) error {
 	return nil
 }
 
+// Pass in the sample just so we can get the collection name
+func (c *Collection) Find(query interface{}) *ResultSet {
+
+	q := c.Collection().Find(query)
+
+	resultset := new(ResultSet)
+
+	resultset.Query = q
+	resultset.Connection = c.Connection
+
+	return resultset
+}
+
+func (c *Collection) FindOne(query interface{}, mod interface{}) error {
+	// Now run a find
+	results := c.Connection.Find(query, mod)
+
+	hasNext := results.Next(mod)
+
+	if !hasNext {
+		return errors.New("No results found")
+	}
+
+	return nil
+}
+
 func (c *Collection) Delete(mod interface{}) error {
 	ensureIdField(mod)
 	f, err := reflections.GetField(mod, "Id")

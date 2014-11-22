@@ -77,11 +77,33 @@ func ensureIdField(mod interface{}) {
 	}
 }
 
+// Pass in the sample just so we can get the collection name
+func (m *Connection) Find(query interface{}, collection interface{}) *ResultSet {
+
+	// If collection is a string, assume that's the collection name
+	var colname string
+	if str, ok := collection.(string); ok {
+		colname = str
+	} else {
+		colname = getCollectionName(collection)
+	}
+
+	col := m.Collection(colname)
+
+	return col.Find(query)
+}
+
 // Wrappers for the collection-level methods to avoid extra typing if you want the collection name to be interpreted from the struct
 func (m *Connection) FindById(id bson.ObjectId, mod interface{}) error {
 	col := m.Collection(getCollectionName(mod))
 
 	return col.FindById(id, mod)
+}
+
+func (m *Connection) FindOne(query interface{}, mod interface{}) error {
+	col := m.Collection(getCollectionName(mod))
+
+	return col.FindOne(query, mod)
 }
 
 func (m *Connection) Save(mod interface{}) (error, []string) {

@@ -80,24 +80,3 @@ func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 
 	return info, nil
 }
-
-// Pass in the sample just so we can get the collection name
-func (c *Connection) Find(query interface{}, collection interface{}) *ResultSet {
-
-	// If collection is a string, assume that's the collection name
-	var colname string
-	if str, ok := collection.(string); ok {
-		colname = str
-	} else {
-		colname = getCollectionName(collection)
-	}
-
-	q := c.Collection(colname).Collection().Find(query)
-
-	resultset := new(ResultSet)
-
-	resultset.Query = q
-	resultset.Connection = c
-
-	return resultset
-}

@@ -162,12 +162,14 @@ err := connection.Collection("people").FindById(bson.ObjectIdHex(StringId), pers
 
 ## Find
 
-Find's a bit different - it's not a direct operation on a model reference so you call it directly via the `Connection`. We may change this in the future but this is how it works currently:
+Find's a bit different - it's not a direct operation on a model reference so you can either call it directly on the `bongo.Connection`, passing either a sample struct or the collection name as the second argument so it knows which collection look in. You can also call `Collection.Find`, in which case you will only have to pass one argument (the query).
 
 ```go
 
 // *bongo.ResultSet
 results := connection.Find(bson.M{"firstName":"Bob"}, "people")
+
+// OR: connection.Collection("people").Find(bson.M{"firstName":"Bob"})
 
 person := new(Person)
 
@@ -187,5 +189,28 @@ results := connection.Find(nil, &Person{})
 To paginate, you can run `Paginate(perPage int, currentPage int)` on the result of `connection.Find()`.
 
 To use additional functions like `sort`, you can access the underlying mgo `Query` via `ResultSet.Query`.
+
+## Find One
+Same as find, but it will populate the reference of the struct you provide as the second argument. If there is no document found, you will get an error:
+
+
+```go
+import (
+	"labix.org/v2/mgo/bson"
+	"fmt"
+)
+
+...
+
+person := new(Person)
+
+err := connection.Find(bson.M{"firstName":"Bob"}, person)
+
+if err != nil {
+	fmt.Println(err.Error())
+} else {
+	fmt.Println("Found user:", person.firstName)
+}
+```
 
 
