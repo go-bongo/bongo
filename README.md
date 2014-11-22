@@ -70,6 +70,25 @@ type Person struct {
 }
 ```
 
+### Indexing
+
+You can use tags to ensure indeces on your collections. The mere presence of an `index` tag will cause Bongo to ensure an index on that field when your model is registered. If `index` is `"unique"`, it will be a unique index.
+
+```go
+type Person struct {
+	Id bson.ObjectId `bson:"_id"`
+	FirstName string `encrypted:"true" bson:"firstName"`
+	LastName string `encrypted:"true" bson:"lastName"`
+	Gender string `index:"true"`
+}
+```
+
+To register your model, you should do the following at boot time. This will ensure the indeces defined in `Person` will be present in the `"people"` collection. If you leave the second argument as a blank string, it will interpret the collection name from the name of the struct (in this case getting "person")
+
+```go
+connection.Register(&Person{}, "people")
+```
+
 ### Hooks
 
 You can add special methods to your struct that will automatically get called by bongo during certain actions. Currently available hooks are:

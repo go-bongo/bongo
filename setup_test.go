@@ -22,8 +22,8 @@ type Child struct {
 
 type FooBar struct {
 	Id    bson.ObjectId `bson:"_id"`
-	Msg   string        `encrypted:"true",bson="msg"`
-	Count int           `encrypted:"false",bson="count"`
+	Msg   string        `encrypted:"true" bson:"msg"`
+	Count int           `encrypted:"false" bson:"count" index:"true"`
 	Child *Child
 }
 

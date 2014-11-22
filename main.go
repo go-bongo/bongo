@@ -5,7 +5,9 @@ import (
 	"github.com/oleiade/reflections"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
+	"log"
 	"reflect"
+	"strings"
 	// "fmt"
 	// "math"
 	// "strings"
@@ -21,6 +23,7 @@ type Config struct {
 type Connection struct {
 	Config  *Config
 	Session *mgo.Session
+	// collection []Collection
 }
 
 // Create a new connection and run Connect()
@@ -57,6 +60,7 @@ func (m *Connection) GetEncryptionKey(collection string) []byte {
 }
 
 func (m *Connection) Collection(name string) *Collection {
+
 	// Just create a new instance - it's cheap and only has name
 	return &Collection{
 		Connection: m,
@@ -64,7 +68,75 @@ func (m *Connection) Collection(name string) *Collection {
 	}
 }
 
+// Register a struct for a certain collection, adding any indeces if necessary. For now this just ensures indeces. Later we might store references to collections, etc
+func (m *Connection) Register(mod interface{}, colName string) error {
+
+	structName := getCollectionName(mod)
+	if len(colName) == 0 {
+		colName = structName
+	}
+
+	// if val, ok := m.collectionMap[structName]; ok {
+	// 	// Already registered. Just return nil
+	// 	return nil
+	// }
+
+	log.Printf("Registering %s\n", colName)
+	collection := m.Collection(colName)
+
+	// Look at any indeces. For now we'll only support top level
+	v := reflect.ValueOf(mod)
+
+	var s reflect.Value
+
+	if v.Kind() == reflect.Ptr {
+		s = v.Elem()
+	} else {
+		s = v
+	}
+
+	// s := reflect.ValueOf(doc).Elem()
+	typeOfT := s.Type()
+	for i := 0; i < s.NumField(); i++ {
+		// f := s.Field(i)
+		fieldName := typeOfT.Field(i).Name
+
+		// encrypt := stringInSlice(fieldName, encryptedFields)
+		index := typeOfT.Field(i).Tag.Get("index")
+
+		var bsonName string
+		bsonName = typeOfT.Field(i).Tag.Get("bson")
+		if len(bsonName) == 0 {
+			bsonName = strings.ToLower(fieldName)
+		}
+		if len(index) > 0 {
+			idx := mgo.Index{
+				Key:        []string{bsonName},
+				Unique:     false,
+				DropDups:   true,
+				Background: true, // See notes.
+				Sparse:     true,
+			}
+
+			if index == "unique" {
+				idx.Unique = true
+			}
+
+			log.Printf("Ensuring index on %s.%s\n", colName, bsonName)
+
+			err := collection.Collection().EnsureIndex(idx)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+
+}
+
 // Get the collection name from an arbitrary interface. Returns type name in snake case
+
 func getCollectionName(mod interface{}) string {
 	return ToSnake(reflect.Indirect(reflect.ValueOf(mod)).Type().Name())
 }
