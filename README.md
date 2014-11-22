@@ -204,7 +204,9 @@ import (
 
 person := new(Person)
 
-err := connection.Find(bson.M{"firstName":"Bob"}, person)
+err := connection.FindOne(bson.M{"firstName":"Bob"}, person)
+
+// Or connection.Collection("people").FindOne(bson.M{"firstName":"Bob"}) if you want to search the "people" collection
 
 if err != nil {
 	fmt.Println(err.Error())
