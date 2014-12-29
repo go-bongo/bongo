@@ -1,8 +1,12 @@
 package bongo
 
 import (
+	// "encoding/json"
+	// "fmt"
 	. "gopkg.in/check.v1"
-	"testing"
+	"labix.org/v2/mgo/bson"
+	// "testing"
+	"time"
 )
 
 /**
@@ -14,22 +18,63 @@ type Name struct {
 }
 
 type Person struct {
-	Name   `encrypted:"true"`
-	Phone  string
-	Number int      `encrypted:"true" bson:"Foo"`
-	Other  bool     `encrypted:"true""`
-	Arr    []string `encrypted:"true"`
+	Name    `encrypted:"true"`
+	Phone   string
+	Number  int             `encrypted:"true" bson:"Foo"`
+	Other   bool            `encrypted:"true""`
+	Arr     []string        `encrypted:"true"`
+	IdVal   bson.ObjectId   `encrypted:"true"`
+	IdArr   []bson.ObjectId `encrypted:"true"`
+	DateVal time.Time       `encrypted:"true"`
+	DateArr []time.Time     `encrypted:"true"`
 }
 
+// func (s *TestSuite) TestEncryptDecryptObjectId(c *C) {
+// 	id := bson.NewObjectId()
+
+// 	marshaled, err := json.Marshal(id)
+
+// 	c.Assert(err, Equals, nil)
+
+// 	fmt.Println(string(marshaled))
+
+// 	encrypted, err := Encrypt(key, marshaled)
+
+// 	c.Assert(err, Equals, nil)
+
+// 	fmt.Println(encrypted)
+
+// 	decrypted, err := Decrypt(key, encrypted)
+
+// 	c.Assert(err, Equals, nil)
+
+// 	fmt.Println(string(decrypted))
+
+// 	newId := new(bson.ObjectId)
+
+// 	err = newId.UnmarshalJSON(decrypted)
+// 	// err = json.Unmarshal(decrypted, newId)
+
+// 	fmt.Println(newId, err)
+// }
+
 func (s *TestSuite) TestEncryptInitializeDocumentFromDB(c *C) {
+	id := bson.NewObjectId()
+
+	currentTime := time.Now()
+
 	p := &Person{
 		Name: Name{
 			First: "Jason",
 			Last:  "Raede",
 		},
-		Phone:  "555-555-5555",
-		Number: 5,
-		Arr:    []string{"foo", "bar", "baz", "bing"},
+		Phone:   "555-555-5555",
+		Number:  5,
+		Arr:     []string{"foo", "bar", "baz", "bing"},
+		IdVal:   id,
+		IdArr:   []bson.ObjectId{id},
+		DateVal: currentTime,
+		DateArr: []time.Time{currentTime},
 	}
 
 	/**
@@ -43,7 +88,6 @@ func (s *TestSuite) TestEncryptInitializeDocumentFromDB(c *C) {
 	c.Assert(encrypted["phone"], Equals, "555-555-5555")
 	// Number is encrypted as "Foo"
 	c.Assert(encrypted["Foo"], Not(Equals), 5)
-
 	c.Assert(encrypted["arr"], Not(Equals), p.Arr)
 
 	newP := new(Person)
@@ -66,6 +110,11 @@ func (s *TestSuite) TestEncryptInitializeDocumentFromDB(c *C) {
 	c.Assert(newP.Arr[2], Equals, "baz")
 	c.Assert(newP.Arr[3], Equals, "bing")
 
+	c.Assert(newP.IdVal.Hex(), Equals, id.Hex())
+	c.Assert(newP.IdArr[0].Hex(), Equals, id.Hex())
+
+	c.Assert(newP.DateVal.Unix(), Equals, currentTime.Unix())
+	c.Assert(newP.DateArr[0].Unix(), Equals, currentTime.Unix())
 }
 
 /////////////////////
@@ -88,8 +137,8 @@ func encryptInitializeDocumentFromDB() {
 }
 
 // Note - potential for this to be ~20% faster if on the first pass we make an array of all the encrypted strings and bson values so we don't have to introspect the tags every time for the same Type. OK for now.
-func BenchmarkEncryptInitializeDocumentFromDB(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+func (s *TestSuite) BenchmarkEncryptInitializeDocumentFromDB(c *C) {
+	for i := 0; i < c.N; i++ {
 		encryptInitializeDocumentFromDB()
 	}
 }

@@ -3,7 +3,7 @@ package bongo
 import (
 	. "gopkg.in/check.v1"
 	"labix.org/v2/mgo/bson"
-	"testing"
+	// "testing"
 )
 
 func (s *TestSuite) TestSaveAndFindWithHooks(c *C) {
@@ -274,14 +274,14 @@ func createAndSaveDocument(conn *Connection) {
 		panic(err)
 	}
 }
-
-func BenchmarkEncryptedAndSave(b *testing.B) {
+func (s *TestSuite) BenchmarkEncryptAndSave(c *C) {
 
 	connection := Connect(config)
 
 	defer connection.Session.Close()
 
-	for i := 0; i < b.N; i++ {
+	c.ResetTimer()
+	for i := 0; i < c.N; i++ {
 		createAndSaveDocument(connection)
 	}
 	connection.Session.DB(config.Database).DropDatabase()

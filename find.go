@@ -2,6 +2,7 @@ package bongo
 
 import (
 	"labix.org/v2/mgo"
+	// "log"
 	"math"
 )
 
@@ -13,10 +14,11 @@ type ResultSet struct {
 }
 
 type PaginationInfo struct {
-	Current      int
-	TotalPages   int
-	PerPage      int
-	TotalRecords int
+	Current       int
+	TotalPages    int
+	PerPage       int
+	TotalRecords  int
+	RecordsOnPage int
 }
 
 func (r *ResultSet) Next(mod interface{}) bool {
@@ -77,6 +79,12 @@ func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 	info.PerPage = perPage
 	info.Current = page
 	info.TotalRecords = count
+
+	if info.Current < info.TotalPages {
+		info.RecordsOnPage = info.PerPage
+	} else {
+		info.RecordsOnPage = int(math.Mod(float64(count), float64(perPage)))
+	}
 
 	return info, nil
 }
