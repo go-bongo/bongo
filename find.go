@@ -14,11 +14,11 @@ type ResultSet struct {
 }
 
 type PaginationInfo struct {
-	Current       int
-	TotalPages    int
-	PerPage       int
-	TotalRecords  int
-	RecordsOnPage int
+	Current       int `json:"current"`
+	TotalPages    int `json:"totalPages"`
+	PerPage       int `json:"perPage"`
+	TotalRecords  int `json:"totalRecords"`
+	RecordsOnPage int `json:"recordsOnPage"`
 }
 
 func (r *ResultSet) Next(mod interface{}) bool {

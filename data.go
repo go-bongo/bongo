@@ -137,18 +137,30 @@ func InitializeDocumentFromDB(key []byte, encrypted map[string]interface{}, doc 
 						panic(err)
 					}
 
+					// If decrypted is null, leave it at zero value
+					if string(decrypted) == "null" {
+						continue
+					}
+
 					iface, _ := reflections.GetField(doc, fieldName)
 					origType := reflect.TypeOf(iface)
 
 					// json.Unmarshal uses map[string]interface{} unless we create a new instance of this type
 					newType := reflect.New(origType).Interface()
 					// newType := iface
+					//
+					// bson.ObjectId whines when you're trying to marshal an empty string, so we'll skip those
+					if origType.String() == "bson.ObjectId" && string(decrypted) == "\"\"" {
+						continue
+					}
+
 					err = json.Unmarshal(decrypted, &newType)
 					if err != nil {
 						panic(err)
 					}
 
 					// Need to get the underlying value since reflect.New always gives a pointer
+
 					value := reflectValue(newType).Interface()
 					err = reflections.SetField(doc, typeOfT.Field(i).Name, value)
 

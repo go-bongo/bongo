@@ -5,7 +5,7 @@ import (
 	// "fmt"
 	. "gopkg.in/check.v1"
 	"labix.org/v2/mgo/bson"
-	// "testing"
+	"testing"
 	"time"
 )
 
@@ -28,35 +28,6 @@ type Person struct {
 	DateVal time.Time       `encrypted:"true"`
 	DateArr []time.Time     `encrypted:"true"`
 }
-
-// func (s *TestSuite) TestEncryptDecryptObjectId(c *C) {
-// 	id := bson.NewObjectId()
-
-// 	marshaled, err := json.Marshal(id)
-
-// 	c.Assert(err, Equals, nil)
-
-// 	fmt.Println(string(marshaled))
-
-// 	encrypted, err := Encrypt(key, marshaled)
-
-// 	c.Assert(err, Equals, nil)
-
-// 	fmt.Println(encrypted)
-
-// 	decrypted, err := Decrypt(key, encrypted)
-
-// 	c.Assert(err, Equals, nil)
-
-// 	fmt.Println(string(decrypted))
-
-// 	newId := new(bson.ObjectId)
-
-// 	err = newId.UnmarshalJSON(decrypted)
-// 	// err = json.Unmarshal(decrypted, newId)
-
-// 	fmt.Println(newId, err)
-// }
 
 func (s *TestSuite) TestEncryptInitializeDocumentFromDB(c *C) {
 	id := bson.NewObjectId()
@@ -135,10 +106,13 @@ func encryptInitializeDocumentFromDB() {
 
 	InitializeDocumentFromDB(key, encrypted, newP)
 }
+func (s *TestSuite) TestEncryptInitializeWithMissingValues(c *C) {
+	encryptInitializeDocumentFromDB()
+}
 
 // Note - potential for this to be ~20% faster if on the first pass we make an array of all the encrypted strings and bson values so we don't have to introspect the tags every time for the same Type. OK for now.
-func (s *TestSuite) BenchmarkEncryptInitializeDocumentFromDB(c *C) {
-	for i := 0; i < c.N; i++ {
+func BenchmarkEncryptInitializeDocumentFromDB(b *testing.B) {
+	for i := 0; i < b.N; i++ {
 		encryptInitializeDocumentFromDB()
 	}
 }
