@@ -2,13 +2,13 @@ package bongo
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
+	// "errors"
+	// "fmt"
 	"github.com/fatih/structs"
 	"github.com/mitchellh/mapstructure"
 	"github.com/oleiade/reflections"
 	"labix.org/v2/mgo/bson"
-	"log"
+	// "log"
 	"reflect"
 	"strings"
 )
@@ -103,10 +103,18 @@ func reflectValue(obj interface{}) reflect.Value {
 	return val
 }
 
+type setValue struct {
+	fieldName string
+	value     interface{}
+}
+
 // Decrypt a struct. Use tag `encrypted="true"` to designate fields as needing to be decrypted
 func InitializeDocumentFromDB(key []byte, encrypted map[string]interface{}, doc interface{}) {
 
-	// decryptedMap := make(map[string]interface{})
+	decryptedMap := make(map[string]interface{})
+
+	setValues := []setValue{}
+
 	// defer func() {
 	// 	if r := recover(); r != nil {
 	// 		log.Fatal("Error matching decrypted value to struct: \n", r)
@@ -116,6 +124,7 @@ func InitializeDocumentFromDB(key []byte, encrypted map[string]interface{}, doc 
 	typeOfT := s.Type()
 
 	for i := 0; i < s.NumField(); i++ {
+
 		fieldName := string(typeOfT.Field(i).Name)
 		// f := s.Field(i)
 
@@ -125,9 +134,9 @@ func InitializeDocumentFromDB(key []byte, encrypted map[string]interface{}, doc 
 			bsonName = strings.ToLower(fieldName)
 		}
 		_, hasField := encrypted[bsonName]
+
 		if hasField {
 			decrypt := typeOfT.Field(i).Tag.Get("encrypted") == "true"
-
 			var decrypted []byte
 			var err error
 			if decrypt {
@@ -162,7 +171,9 @@ func InitializeDocumentFromDB(key []byte, encrypted map[string]interface{}, doc 
 					// Need to get the underlying value since reflect.New always gives a pointer
 
 					value := reflectValue(newType).Interface()
-					err = reflections.SetField(doc, typeOfT.Field(i).Name, value)
+
+					setValues = append(setValues, setValue{fieldName, value})
+					// err = reflections.SetField(doc, typeOfT.Field(i).Name, value)
 
 					if err != nil {
 						panic(err)
@@ -174,45 +185,72 @@ func InitializeDocumentFromDB(key []byte, encrypted map[string]interface{}, doc 
 			} else {
 
 				// Only set if it's not the zero value and not nil
-				//
-				if encrypted[bsonName] != nil {
-					zeroVal := reflect.Zero(reflect.TypeOf(encrypted[bsonName]))
 
-					if encrypted[bsonName] == zeroVal {
-						log.Println("ZERO VAL")
-					}
-
-					field, _ := reflections.GetField(doc, fieldName)
-
-					// We may still need to marshal since a sub doc would be a map[string]interface{} instead of an instance of a struct.
-					shouldBe := reflect.TypeOf(field)
-					isActually := reflect.TypeOf(encrypted[bsonName])
-					if shouldBe != isActually {
-						if isActually.String() == "map[string]interface {}" {
-							child := reflect.New(shouldBe).Interface()
-							err := mapstructure.Decode(encrypted[bsonName], child)
-
-							value := reflectValue(child).Interface()
-							err = reflections.SetField(doc, fieldName, value)
-
-							if err != nil {
-								panic(err)
-							}
-						} else {
-							panic(errors.New(fmt.Sprintf("Unable to marshal type %s to %s", isActually.String(), shouldBe.String())))
-						}
-					} else {
-
-						err = reflections.SetField(doc, fieldName, encrypted[bsonName])
-
-						if err != nil {
-							panic(err)
-						}
-					}
-
-				}
+				decryptedMap[fieldName] = encrypted[bsonName]
 
 			}
 		}
 	}
+
+	// Decode the decrypted map into the doc, then set the other fields on teh doc
+	err := mapstructure.Decode(decryptedMap, doc)
+
+	if err != nil {
+		panic(err)
+	}
+
+	for _, val := range setValues {
+		err := reflections.SetField(doc, val.fieldName, val.value)
+
+		if err != nil {
+			panic(err)
+		}
+	}
+
 }
+
+// func decodeSlice(name string, data interface{}, val reflect.Value) error {
+// 	dataVal := reflect.Indirect(reflect.ValueOf(data))
+// 	dataValKind := dataVal.Kind()
+// 	valType := val.Type()
+// 	valElemType := valType.Elem()
+// 	sliceType := reflect.SliceOf(valElemType)
+
+// 	// Check input type
+// 	if dataValKind != reflect.Array && dataValKind != reflect.Slice {
+// 		// Accept empty map instead of array/slice in weakly typed mode
+// 		if d.config.WeaklyTypedInput && dataVal.Kind() == reflect.Map && dataVal.Len() == 0 {
+// 			val.Set(reflect.MakeSlice(sliceType, 0, 0))
+// 			return nil
+// 		} else {
+// 			return fmt.Errorf(
+// 				"'%s': source data must be an array or slice, got %s", name, dataValKind)
+// 		}
+// 	}
+
+// 	// Make a new slice to hold our result, same size as the original data.
+// 	valSlice := reflect.MakeSlice(sliceType, dataVal.Len(), dataVal.Len())
+
+// 	// Accumulate any errors
+// 	errors := make([]string, 0)
+
+// 	for i := 0; i < dataVal.Len(); i++ {
+// 		currentData := dataVal.Index(i).Interface()
+// 		currentField := valSlice.Index(i)
+
+// 		fieldName := fmt.Sprintf("%s[%d]", name, i)
+// 		if err := d.decode(fieldName, currentData, currentField); err != nil {
+// 			errors = appendErrors(errors, err)
+// 		}
+// 	}
+
+// 	// Finally, set the value to the slice we built up
+// 	val.Set(valSlice)
+
+// 	// If there were errors, we return those
+// 	if len(errors) > 0 {
+// 		return &Error{errors}
+// 	}
+
+// 	return nil
+// }

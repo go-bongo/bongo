@@ -18,15 +18,16 @@ type Name struct {
 }
 
 type Person struct {
-	Name    `encrypted:"true"`
-	Phone   string
-	Number  int             `encrypted:"true" bson:"Foo"`
-	Other   bool            `encrypted:"true""`
-	Arr     []string        `encrypted:"true"`
-	IdVal   bson.ObjectId   `encrypted:"true"`
-	IdArr   []bson.ObjectId `encrypted:"true"`
-	DateVal time.Time       `encrypted:"true"`
-	DateArr []time.Time     `encrypted:"true"`
+	Name           `encrypted:"true"`
+	Phone          string
+	Number         int             `encrypted:"true" bson:"Foo"`
+	Other          bool            `encrypted:"true""`
+	Arr            []string        `encrypted:"true"`
+	IdVal          bson.ObjectId   `encrypted:"true"`
+	IdArr          []bson.ObjectId `encrypted:"true"`
+	DateVal        time.Time       `encrypted:"true"`
+	DateArr        []time.Time     `encrypted:"true"`
+	UnencryptedArr []string
 }
 
 func (s *TestSuite) TestEncryptInitializeDocumentFromDB(c *C) {
@@ -46,6 +47,7 @@ func (s *TestSuite) TestEncryptInitializeDocumentFromDB(c *C) {
 		IdArr:   []bson.ObjectId{id},
 		DateVal: currentTime,
 		DateArr: []time.Time{currentTime},
+		// UnencryptedArr: []string{"foo", "bar"},
 	}
 
 	/**
