@@ -2,7 +2,7 @@ package bongo
 
 import (
 	"labix.org/v2/mgo"
-	// "log"
+	"log"
 	"math"
 )
 
@@ -37,6 +37,9 @@ func (r *ResultSet) Next(mod interface{}) bool {
 		InitializeDocumentFromDB(r.Connection.GetEncryptionKey(colname), returnMap, mod)
 		return true
 	}
+
+	count, err := r.Query.Count()
+	log.Println("No result", count, err)
 	return false
 }
 

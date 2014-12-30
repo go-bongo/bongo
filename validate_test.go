@@ -26,9 +26,9 @@ func (s *TestSuite) TestValidateMongoIdRef(c *C) {
 	message.Msg = "Foo"
 	message.Count = 5
 
-	err, _ := connection.Save(message)
+	res := connection.Save(message)
 
-	c.Assert(err, Equals, nil)
+	c.Assert(res.Success, Equals, true)
 	c.Assert(ValidateMongoIdRef(message.Id, connection.Collection("foo_bar")), Equals, true)
 	c.Assert(ValidateMongoIdRef(bson.NewObjectId(), connection.Collection("foo_bar")), Equals, false)
 	c.Assert(ValidateMongoIdRef(bson.NewObjectId(), connection.Collection("other_collection")), Equals, false)

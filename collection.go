@@ -2,10 +2,11 @@ package bongo
 
 import (
 	"errors"
+	"fmt"
 	"github.com/oleiade/reflections"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
-	"log"
+	// "log"
 	"reflect"
 	// "math"
 	// "strings"
@@ -20,10 +21,18 @@ func (c *Collection) Collection() *mgo.Collection {
 	return c.Connection.Session.DB(c.Connection.Config.Database).C(c.Name)
 }
 
-func (c *Collection) Save(mod interface{}) (error, []string) {
+func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 	defer func() {
+
 		if r := recover(); r != nil {
-			log.Fatal("Failed to save:\n", r)
+			if e, ok := r.(error); ok {
+				result = NewSaveResult(false, e)
+			} else if e, ok := r.(string); ok {
+				result = NewSaveResult(false, errors.New(e))
+			} else {
+				result = NewSaveResult(false, errors.New(fmt.Sprint(r)))
+			}
+
 		}
 	}()
 
@@ -58,8 +67,9 @@ func (c *Collection) Save(mod interface{}) (error, []string) {
 		results := reflect.ValueOf(mod).MethodByName("Validate").Call([]reflect.Value{})
 		if errs, ok := results[0].Interface().([]string); ok {
 			if len(errs) > 0 {
-				err := errors.New("Validation failed")
-				return err, errs
+				err := NewSaveResult(false, errors.New("Validation failed"))
+				err.ValidationErrors = errs
+				return err
 			}
 		}
 	}
@@ -87,7 +97,11 @@ func (c *Collection) Save(mod interface{}) (error, []string) {
 
 	_, err = c.Collection().UpsertId(modelMap["_id"], modelMap)
 
-	return err, nil
+	if err != nil {
+		panic(err)
+	}
+
+	return NewSaveResult(true, nil)
 }
 
 func (c *Collection) FindById(id bson.ObjectId, mod interface{}) error {
@@ -113,6 +127,7 @@ func (c *Collection) FindById(id bson.ObjectId, mod interface{}) error {
 // Pass in the sample just so we can get the collection name
 func (c *Collection) Find(query interface{}) *ResultSet {
 
+	// Count for testing
 	q := c.Collection().Find(query)
 
 	resultset := new(ResultSet)
@@ -125,7 +140,7 @@ func (c *Collection) Find(query interface{}) *ResultSet {
 
 func (c *Collection) FindOne(query interface{}, mod interface{}) error {
 	// Now run a find
-	results := c.Connection.Find(query, mod)
+	results := c.Find(query)
 
 	hasNext := results.Next(mod)
 

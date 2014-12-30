@@ -17,9 +17,9 @@ func (s *TestSuite) TestSaveAndFindWithHooks(c *C) {
 	message.Msg = "Foo"
 	message.Count = 5
 
-	err, _ := connection.Save(message)
+	result := connection.Save(message)
 
-	c.Assert(err, Equals, nil)
+	c.Assert(result.Success, Equals, true)
 
 	newMessage := new(FooBar)
 
@@ -33,9 +33,9 @@ func (s *TestSuite) TestSaveAndFindWithHooks(c *C) {
 	c.Assert(newMessage.Count, Equals, 12)
 
 	// Saving it again should run +1 on BeforeSave and +2 on BeforeUpdate
-	err, _ = connection.Save(message)
+	result = connection.Save(message)
 
-	c.Assert(err, Equals, nil)
+	c.Assert(result.Success, Equals, true)
 	c.Assert(message.Count, Equals, 10)
 
 	connection.Session.DB(config.Database).DropDatabase()
@@ -55,9 +55,9 @@ func (s *TestSuite) TestSaveAndFindWithChild(c *C) {
 		Foo:     "foo",
 		BazBing: "bar",
 	}
-	err, _ := connection.Save(message)
+	result := connection.Save(message)
 
-	c.Assert(err, Equals, nil)
+	c.Assert(result.Success, Equals, true)
 
 	newMessage := new(FooBar)
 
@@ -79,10 +79,9 @@ func (s *TestSuite) TestValidationFailure(c *C) {
 	message.Msg = "Foo"
 	message.Count = 3
 
-	err, errs := connection.Save(message)
-
-	c.Assert(err.Error(), Equals, "Validation failed")
-	c.Assert(errs[0], Equals, "count cannot be 3")
+	err := connection.Save(message)
+	c.Assert(err.Error.Error(), Equals, "Validation failed")
+	c.Assert(err.ValidationErrors[0], Equals, "count cannot be 3")
 
 	connection.Session.DB(config.Database).DropDatabase()
 }
@@ -112,14 +111,14 @@ func (s *TestSuite) TestDelete(c *C) {
 	message.Msg = "Foo"
 	message.Count = 5
 
-	err, _ := connection.Save(message)
+	result := connection.Save(message)
 
-	c.Assert(err, Equals, nil)
+	c.Assert(result.Success, Equals, true)
 
 	connection.Delete(message)
 
 	newMessage := new(FooBar)
-	err = connection.FindById(message.Id, newMessage)
+	err := connection.FindById(message.Id, newMessage)
 	c.Assert(err.Error(), Equals, "not found")
 	// Make sure the ids are the same
 	//
@@ -138,9 +137,9 @@ func (s *TestSuite) TestFindOne(c *C) {
 	message.Msg = "Foo"
 	message.Count = 5
 
-	err, _ := connection.Save(message)
+	res := connection.Save(message)
 
-	c.Assert(err, Equals, nil)
+	c.Assert(res.Success, Equals, true)
 
 	result := &FooBar{}
 
@@ -148,7 +147,7 @@ func (s *TestSuite) TestFindOne(c *C) {
 		"count": 7,
 	}
 
-	err = connection.FindOne(query, result)
+	err := connection.FindOne(query, result)
 
 	c.Assert(err, Equals, nil)
 
@@ -170,17 +169,17 @@ func (s *TestSuite) TestFind(c *C) {
 	message.Msg = "Foo"
 	message.Count = 5
 
-	err, _ := connection.Save(message)
+	result := connection.Save(message)
 
-	c.Assert(err, Equals, nil)
+	c.Assert(result.Success, Equals, true)
 
 	message2 := new(FooBar)
 	message2.Msg = "Bar"
 	message2.Count = 10
 
-	err, _ = connection.Save(message2)
+	result = connection.Save(message2)
 
-	c.Assert(err, Equals, nil)
+	c.Assert(result.Success, Equals, true)
 
 	// Now run a find
 	results := connection.Find(nil, &FooBar{})
@@ -214,17 +213,17 @@ func (s *TestSuite) TestFindWithPagination(c *C) {
 	message.Msg = "Foo"
 	message.Count = 5
 
-	err, _ := connection.Save(message)
+	result := connection.Save(message)
 
-	c.Assert(err, Equals, nil)
+	c.Assert(result.Success, Equals, true)
 
 	message2 := new(FooBar)
 	message2.Msg = "Bar"
 	message2.Count = 5
 
-	err, _ = connection.Save(message2)
+	result = connection.Save(message2)
 
-	c.Assert(err, Equals, nil)
+	c.Assert(result.Success, Equals, true)
 
 	// Now run a find (hooks will add 2)
 	results := connection.Find(&bson.M{"count": 7}, &FooBar{})
@@ -269,8 +268,8 @@ func createAndSaveDocument(conn *Connection) {
 		Count: 5,
 	}
 
-	err, _ := conn.Save(message)
-	if err != nil {
+	err := conn.Save(message)
+	if err.Error != nil {
 		panic(err)
 	}
 }

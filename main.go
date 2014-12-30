@@ -2,6 +2,7 @@ package bongo
 
 import (
 	// "fmt"
+	"encoding/json"
 	"github.com/oleiade/reflections"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
@@ -18,6 +19,29 @@ type Config struct {
 	Database                   string
 	EncryptionKey              string
 	EncryptionKeyPerCollection map[string]string
+}
+
+type SaveResult struct {
+	Success          bool
+	Err              error
+	ValidationErrors []string
+}
+
+func (s *SaveResult) Error() string {
+	return s.Err.Error()
+}
+
+func NewSaveResult(success bool, err error) *SaveResult {
+	return &SaveResult{success, err, []string{}}
+}
+
+func (s *SaveResult) MarshalJSON() ([]byte, error) {
+	// If there are validation errors, just return those as an array. Otherwise marshal the error.Error() string
+	if len(s.ValidationErrors) > 0 {
+		return json.Marshal(s.ValidationErrors)
+	} else {
+		return json.Marshal(s.Err.Error())
+	}
 }
 
 type Connection struct {
@@ -178,7 +202,7 @@ func (m *Connection) FindOne(query interface{}, mod interface{}) error {
 	return col.FindOne(query, mod)
 }
 
-func (m *Connection) Save(mod interface{}) (error, []string) {
+func (m *Connection) Save(mod interface{}) *SaveResult {
 	col := m.Collection(getCollectionName(mod))
 
 	return col.Save(mod)
