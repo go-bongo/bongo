@@ -99,7 +99,7 @@ func (s *TestSuite) TestCascade(c *C) {
 	// Cascade the parent
 	prepped := PrepDocumentForSave(key, child)
 
-	Cascade(child, prepped)
+	CascadeSave(child, prepped)
 
 	// Get the child
 	// newChild := &Child{
@@ -118,7 +118,7 @@ func (s *TestSuite) TestCascade(c *C) {
 	res = childCollection.Save(child)
 	c.Assert(res.Success, Equals, true)
 	prepped = PrepDocumentForSave(key, child)
-	Cascade(child, prepped)
+	CascadeSave(child, prepped)
 
 	newParent1 := &Parent{}
 	collection.FindById(parent.Id, newParent1)
@@ -130,8 +130,12 @@ func (s *TestSuite) TestCascade(c *C) {
 	c.Assert(newParent2.Child.Id.Hex(), Equals, child.Id.Hex())
 	c.Assert(newParent2.Children[0].Name, Equals, "Foo McGoo")
 	c.Assert(newParent2.Children[0].Id.Hex(), Equals, child.Id.Hex())
-	// c.Assert(newParent.Child.Id.Hex(), Equals, child.Id.Hex())
-	// c.Assert(newParent.Children[0].Name, Equals, "Foo McGoo")
-	// c.Assert(newParent.Children[0].Id.Hex(), Equals, child.Id.Hex())
+
+	newParent3 := &Parent{}
+	// Now delete it
+	CascadeDelete(child)
+	collection.FindById(parent2.Id, newParent3)
+	c.Assert(newParent3.Child, IsNil)
+	c.Assert(len(newParent3.Children), Equals, 0)
 
 }

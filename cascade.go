@@ -3,6 +3,7 @@ package bongo
 import (
 	"errors"
 	// "github.com/maxwellhealth/dotaccess"
+	"github.com/oleiade/reflections"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	"log"
@@ -36,7 +37,7 @@ type CascadeConfig struct {
 
 // Cascades a document's properties to related documents, after it has been prepared
 // for db insertion (encrypted, etc)
-func Cascade(doc interface{}, preparedForSave map[string]interface{}) {
+func CascadeSave(doc interface{}, preparedForSave map[string]interface{}) {
 	// Find out which properties to cascade
 	if conv, ok := doc.(interface {
 		GetCascade() []*CascadeConfig
@@ -45,14 +46,62 @@ func Cascade(doc interface{}, preparedForSave map[string]interface{}) {
 		toCascade := conv.GetCascade()
 
 		for _, conf := range toCascade {
-			info, err := CascadeWithConfig(conf, preparedForSave)
+			info, err := CascadeSaveWithConfig(conf, preparedForSave)
 			log.Println(info, err)
 		}
 	}
-
 }
 
-func CascadeWithConfig(conf *CascadeConfig, preparedForSave map[string]interface{}) (*mgo.ChangeInfo, error) {
+func CascadeDelete(doc interface{}) {
+	// Find out which properties to cascade
+	if conv, ok := doc.(interface {
+		GetCascade() []*CascadeConfig
+	}); ok {
+		toCascade := conv.GetCascade()
+
+		// Get the ID
+		id, err := reflections.GetField(doc, "Id")
+
+		if err != nil {
+			panic(err)
+		}
+
+		// Cast as bson.ObjectId
+		if bsonId, ok := id.(bson.ObjectId); ok {
+			for _, conf := range toCascade {
+				info, err := CascadeDeleteWithConfig(conf, bsonId)
+				log.Println(info, err)
+			}
+		}
+
+	}
+}
+
+func CascadeDeleteWithConfig(conf *CascadeConfig, id bson.ObjectId) (*mgo.ChangeInfo, error) {
+	switch conf.RelType {
+	case REL_ONE:
+		update := map[string]map[string]interface{}{
+			"$set": map[string]interface{}{},
+		}
+
+		update["$set"][conf.ThroughProp] = nil
+
+		return conf.Collection.UpdateAll(conf.Query, update)
+	case REL_MANY:
+		update := map[string]map[string]interface{}{
+			"$pull": map[string]interface{}{},
+		}
+
+		update["$pull"][conf.ThroughProp] = bson.M{
+			"_id": id,
+		}
+		return conf.Collection.UpdateAll(conf.Query, update)
+	}
+
+	return &mgo.ChangeInfo{}, errors.New("Invalid relation type")
+}
+
+func CascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]interface{}) (*mgo.ChangeInfo, error) {
 	// Create a new map with just the props to cascade
 
 	id := preparedForSave["_id"]

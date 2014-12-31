@@ -98,6 +98,9 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 	// 3) Convert the model into a map using the crypt library
 	modelMap := PrepDocumentForSave(c.Connection.GetEncryptionKey(c.Name), mod)
 
+	// Cascade?
+	CascadeSave(mod, modelMap)
+
 	_, err = c.Collection().UpsertId(modelMap["_id"], modelMap)
 
 	if err != nil {
@@ -161,6 +164,25 @@ func (c *Collection) Delete(mod interface{}) error {
 		return err
 	}
 	id := f.(bson.ObjectId)
+	if hook, ok := mod.(interface {
+		BeforeDelete()
+	}); ok {
+		hook.BeforeDelete()
+	}
 
-	return c.Collection().Remove(bson.M{"_id": id})
+	err = c.Collection().Remove(bson.M{"_id": id})
+
+	if err != nil {
+		return err
+	}
+
+	CascadeDelete(mod)
+	if hook, ok := mod.(interface {
+		AfterDelete()
+	}); ok {
+		hook.AfterDelete()
+	}
+
+	return nil
+
 }
