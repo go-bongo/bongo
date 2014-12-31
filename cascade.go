@@ -39,10 +39,10 @@ type CascadeConfig struct {
 func Cascade(doc interface{}, preparedForSave map[string]interface{}) {
 	// Find out which properties to cascade
 	if conv, ok := doc.(interface {
-		GetCascade(map[string]interface{}) []*CascadeConfig
+		GetCascade() []*CascadeConfig
 	}); ok {
 		log.Println("Object has GetCascade method")
-		toCascade := conv.GetCascade(preparedForSave)
+		toCascade := conv.GetCascade()
 
 		for _, conf := range toCascade {
 			info, err := CascadeWithConfig(conf, preparedForSave)
@@ -71,9 +71,8 @@ func CascadeWithConfig(conf *CascadeConfig, preparedForSave map[string]interface
 	switch conf.RelType {
 	case REL_ONE:
 
-		log.Println("Cascading single rel")
-		// Remove self from previous relations
 		if len(conf.OldQuery) > 0 {
+
 			update1 := map[string]map[string]interface{}{
 				"$set": map[string]interface{}{},
 			}
@@ -92,10 +91,12 @@ func CascadeWithConfig(conf *CascadeConfig, preparedForSave map[string]interface
 		// Just update
 		return conf.Collection.UpdateAll(conf.Query, update)
 	case REL_MANY:
-		update1 := map[string]interface{}{
-			"$pull": map[string]interface{}{
-				"_id": id,
-			},
+		update1 := map[string]map[string]interface{}{
+			"$pull": map[string]interface{}{},
+		}
+
+		update1["$pull"][conf.ThroughProp] = bson.M{
+			"_id": id,
 		}
 
 		if len(conf.OldQuery) > 0 {

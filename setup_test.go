@@ -62,7 +62,7 @@ var config = &Config{
 var connection = Connect(config)
 
 func (s *TestSuite) TearDownTest(c *C) {
-	connection.Session.DB(config.Database).DropDatabase()
+	// connection.Session.DB(config.Database).DropDatabase()
 }
 
 func (s *TestSuite) TearDownSuite(c *C) {
