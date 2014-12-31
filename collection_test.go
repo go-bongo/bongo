@@ -3,14 +3,11 @@ package bongo
 import (
 	. "gopkg.in/check.v1"
 	"labix.org/v2/mgo/bson"
-	"testing"
+	"log"
+	// "testing"
 )
 
 func (s *TestSuite) TestSaveAndFindWithHooks(c *C) {
-
-	connection := Connect(config)
-
-	defer connection.Session.Close()
 
 	// This needs to always be a pointer, otherwise the encryption component won't like it.
 	message := new(FooBar)
@@ -51,7 +48,7 @@ func (s *TestSuite) TestSaveAndFindWithChild(c *C) {
 	message := new(FooBar)
 	message.Msg = "Foo"
 	message.Count = 5
-	message.Child = &Child{
+	message.Child = &Nested{
 		Foo:     "foo",
 		BazBing: "bar",
 	}
@@ -79,9 +76,10 @@ func (s *TestSuite) TestValidationFailure(c *C) {
 	message.Msg = "Foo"
 	message.Count = 3
 
-	err := connection.Save(message)
-	c.Assert(err.Error.Error(), Equals, "Validation failed")
-	c.Assert(err.ValidationErrors[0], Equals, "count cannot be 3")
+	result := connection.Save(message)
+
+	c.Assert(result.Err.Error(), Equals, "Validation failed")
+	c.Assert(result.ValidationErrors[0], Equals, "count cannot be 3")
 
 	connection.Session.DB(config.Database).DropDatabase()
 }
@@ -204,10 +202,6 @@ func (s *TestSuite) TestFind(c *C) {
 
 func (s *TestSuite) TestFindWithPagination(c *C) {
 
-	connection := Connect(config)
-
-	defer connection.Session.Close()
-
 	// This needs to always be a pointer, otherwise the encryption component won't like it.
 	message := new(FooBar)
 	message.Msg = "Foo"
@@ -256,32 +250,64 @@ func (s *TestSuite) TestFindWithPagination(c *C) {
 
 	c.Assert(count2, Equals, 1)
 
-	connection.Session.DB(config.Database).DropDatabase()
+}
+
+type RecursiveChild struct {
+	Bar string `bson:"bar" bongo:"encrypted"`
+}
+type RecursiveParent struct {
+	Id    bson.ObjectId   `bson:"_id"`
+	Foo   string          `bson:"foo" bongo:"encrypted"`
+	Child *RecursiveChild `bson:"child"`
+}
+
+func (s *TestSuite) TestRecursiveSaveWithEncryption(c *C) {
+	parent := &RecursiveParent{
+		Foo: "foo",
+		Child: &RecursiveChild{
+			Bar: "bar",
+		},
+	}
+
+	connection.Save(parent)
+
+	// Fetch natively...
+
+	newParent := &RecursiveParent{}
+
+	// Now fetch using bongo to decrypt...
+	connection.Collection("recursive_parent").FindById(parent.Id, newParent)
+	c.Assert(newParent.Child.Bar, Equals, "bar")
+
+	connection.Collection("recursive_parent").Collection().FindId(parent.Id).One(newParent)
+
+	c.Assert(newParent.Child.Bar, Not(Equals), "bar")
+}
+
+// Just to make sure the benchmark will work...
+func (s *TestSuite) TestBenchmarkEncryptAndSave(c *C) {
+	createAndSaveDocument()
 }
 
 /////////////////////
 /// BENCHMARKS
 /////////////////////
-func createAndSaveDocument(conn *Connection) {
+func createAndSaveDocument() {
 	message := &FooBar{
 		Msg:   "Foo",
 		Count: 5,
 	}
 
-	err := conn.Save(message)
-	if err.Error != nil {
-		panic(err)
+	status := connection.Save(message)
+	// log.Println("status:", status.Success)
+	if status.Success != true {
+		log.Println(status.Error)
+		panic(status.Error)
 	}
 }
-func BenchmarkEncryptAndSave(b *testing.B) {
+func (s *TestSuite) BenchmarkEncryptAndSave(c *C) {
 
-	connection := Connect(config)
-
-	defer connection.Session.Close()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		createAndSaveDocument(connection)
+	for i := 0; i < c.N; i++ {
+		createAndSaveDocument()
 	}
-	connection.Session.DB(config.Database).DropDatabase()
 }

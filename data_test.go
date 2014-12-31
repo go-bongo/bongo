@@ -2,10 +2,10 @@ package bongo
 
 import (
 	// "encoding/json"
-	// "fmt"
+	"fmt"
 	. "gopkg.in/check.v1"
 	"labix.org/v2/mgo/bson"
-	"testing"
+	// "testing"
 	"time"
 )
 
@@ -18,15 +18,15 @@ type Name struct {
 }
 
 type Person struct {
-	Name           `encrypted:"true"`
+	Name           `bongo:"encrypted"`
 	Phone          string
-	Number         int             `encrypted:"true" bson:"Foo"`
-	Other          bool            `encrypted:"true""`
-	Arr            []string        `encrypted:"true"`
-	IdVal          bson.ObjectId   `encrypted:"true"`
-	IdArr          []bson.ObjectId `encrypted:"true"`
-	DateVal        time.Time       `encrypted:"true"`
-	DateArr        []time.Time     `encrypted:"true"`
+	Number         int             `bongo:"encrypted" bson:"Foo"`
+	Other          bool            `bongo:"encrypted"`
+	Arr            []string        `bongo:"encrypted"`
+	IdVal          bson.ObjectId   `bongo:"encrypted" bson:",omitempty"`
+	IdArr          []bson.ObjectId `bongo:"encrypted"`
+	DateVal        time.Time       `bongo:"encrypted"`
+	DateArr        []time.Time     `bongo:"encrypted"`
 	UnencryptedArr []string
 }
 
@@ -50,6 +50,7 @@ func (s *TestSuite) TestEncryptInitializeDocumentFromDB(c *C) {
 		// UnencryptedArr: []string{"foo", "bar"},
 	}
 
+	fmt.Println(p)
 	/**
 	 * @type map[string]interface{}
 	 */
@@ -65,6 +66,7 @@ func (s *TestSuite) TestEncryptInitializeDocumentFromDB(c *C) {
 
 	newP := new(Person)
 
+	fmt.Println(encrypted)
 	InitializeDocumentFromDB(key, encrypted, newP)
 
 	// Encrypted structs should be converted from JSON string to the actual struct
@@ -113,8 +115,8 @@ func (s *TestSuite) TestEncryptInitializeWithMissingValues(c *C) {
 }
 
 // Note - potential for this to be ~20% faster if on the first pass we make an array of all the encrypted strings and bson values so we don't have to introspect the tags every time for the same Type. OK for now.
-func BenchmarkEncryptInitializeDocumentFromDB(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+func (s *TestSuite) BenchmarkEncryptInitializeDocumentFromDB(c *C) {
+	for i := 0; i < c.N; i++ {
 		encryptInitializeDocumentFromDB()
 	}
 }

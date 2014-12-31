@@ -15,7 +15,7 @@ var _ = Suite(&TestSuite{})
 
 var key = []byte("asdf1234asdf1234")
 
-type Child struct {
+type Nested struct {
 	Foo     string
 	BazBing string `bson:"bazBing"`
 }
@@ -24,7 +24,7 @@ type FooBar struct {
 	Id    bson.ObjectId `bson:"_id"`
 	Msg   string        `encrypted:"true" bson:"msg"`
 	Count int           `encrypted:"false" bson:"count" index:"true"`
-	Child *Child
+	Child *Nested
 }
 
 func (f *FooBar) Validate() []string {
@@ -57,4 +57,14 @@ var config = &Config{
 	ConnectionString: "localhost",
 	Database:         "gotest",
 	EncryptionKey:    "asdf1234asdf1234",
+}
+
+var connection = Connect(config)
+
+func (s *TestSuite) TearDownTest(c *C) {
+	connection.Session.DB(config.Database).DropDatabase()
+}
+
+func (s *TestSuite) TearDownSuite(c *C) {
+	connection.Session.Close()
 }
