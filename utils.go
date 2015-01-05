@@ -1,4 +1,3 @@
-// Stolen from gorm.
 package bongo
 
 import (
