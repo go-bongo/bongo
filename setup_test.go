@@ -3,6 +3,7 @@ package bongo
 import (
 	. "gopkg.in/check.v1"
 	"labix.org/v2/mgo/bson"
+	"log"
 	"testing"
 )
 
@@ -13,6 +14,18 @@ type TestSuite struct{}
 
 var _ = Suite(&TestSuite{})
 
+type NullWriter int
+
+func (NullWriter) Write([]byte) (int, error) { return 0, nil }
+
+func (s *TestSuite) SetUpTest(c *C) {
+
+	if !testing.Verbose() {
+		log.SetOutput(new(NullWriter))
+	}
+
+}
+
 var key = []byte("asdf1234asdf1234")
 
 type Nested struct {
@@ -22,8 +35,8 @@ type Nested struct {
 
 type FooBar struct {
 	Id    bson.ObjectId `bson:"_id"`
-	Msg   string        `encrypted:"true" bson:"msg"`
-	Count int           `encrypted:"false" bson:"count" index:"true"`
+	Msg   string        `bongo:"encrypted" bson:"msg"`
+	Count int           `bongo:"index"`
 	Child *Nested
 }
 

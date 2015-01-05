@@ -6,9 +6,10 @@ import (
 )
 
 type FooChangeTest struct {
-	Id        bson.ObjectId `bson:"_id,omitempty"`
-	StringVal string
-	IntVal    int
+	Id          bson.ObjectId `bson:"_id,omitempty"`
+	StringVal   string
+	IntVal      int
+	DiffTracker *DiffTracker
 }
 
 type FooBarChangeTest struct {
@@ -57,18 +58,15 @@ func (s *TestSuite) TestGetChangedFields(c *C) {
 }
 
 func (s *TestSuite) TestModified(c *C) {
-	myChecker := NewChangeChecker()
-
 	foo1 := &FooChangeTest{
 		StringVal: "foo",
 		IntVal:    1,
 	}
 
-	connection.Save(foo1)
-
-	myChecker.StoreOriginal(foo1.Id, foo1)
+	foo1.DiffTracker = NewDiffTracker(foo1)
+	foo1.DiffTracker.Reset()
 
 	foo1.StringVal = "bar"
 
-	c.Assert(myChecker.Modified(foo1.Id, "StringVal", foo1), Equals, true)
+	c.Assert(foo1.DiffTracker.Modified("StringVal"), Equals, true)
 }

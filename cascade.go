@@ -6,7 +6,7 @@ import (
 	"github.com/oleiade/reflections"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
-	"log"
+	// "log"
 	// "strings"
 )
 
@@ -42,12 +42,10 @@ func CascadeSave(doc interface{}, preparedForSave map[string]interface{}) {
 	if conv, ok := doc.(interface {
 		GetCascade() []*CascadeConfig
 	}); ok {
-		log.Println("Object has GetCascade method")
 		toCascade := conv.GetCascade()
 
 		for _, conf := range toCascade {
-			info, err := CascadeSaveWithConfig(conf, preparedForSave)
-			log.Println(info, err)
+			CascadeSaveWithConfig(conf, preparedForSave)
 		}
 	}
 }
@@ -69,8 +67,7 @@ func CascadeDelete(doc interface{}) {
 		// Cast as bson.ObjectId
 		if bsonId, ok := id.(bson.ObjectId); ok {
 			for _, conf := range toCascade {
-				info, err := CascadeDeleteWithConfig(conf, bsonId)
-				log.Println(info, err)
+				CascadeDeleteWithConfig(conf, bsonId)
 			}
 		}
 
@@ -111,11 +108,8 @@ func CascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]inter
 	data["_id"] = id
 
 	for _, prop := range conf.Properties {
-		log.Println("Getting property", prop, "of ", preparedForSave)
 		data[prop] = preparedForSave[prop]
 	}
-
-	log.Println("Data to cascade:", data)
 
 	switch conf.RelType {
 	case REL_ONE:
@@ -127,7 +121,6 @@ func CascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]inter
 			}
 
 			update1["$set"][conf.ThroughProp] = nil
-
 			conf.Collection.UpdateAll(conf.OldQuery, update1)
 		}
 

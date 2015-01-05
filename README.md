@@ -36,7 +36,7 @@ If you need to, you can access the raw `mgo` session with `connection.Session`
 
 ## Create a Model
 
-Any struct can be used as a model as long as it has an Id property with type `bson.ObjectId` (from `mgo/bson`). `bson` tags are passed through to mgo. You can specify a field as being encrypted using `encrypted:"true"`
+Any struct can be used as a model as long as it has an Id property with type `bson.ObjectId` (from `mgo/bson`). `bson` tags are passed through to mgo. You can specify a field as being encrypted using `bongo:"encrypted"`
 
 For example:
 
@@ -44,8 +44,8 @@ For example:
 
 type Person struct {
 	Id bson.ObjectId `bson:"_id"`
-	FirstName string `encrypted:"true" bson:"firstName"`
-	LastName string `encrypted:"true" bson:"lastName"`
+	FirstName string `bongo:"encrypted" bson:"firstName"`
+	LastName string `bongo:"encrypted" bson:"lastName"`
 	Gender string
 }
 ```
@@ -63,23 +63,23 @@ type Address struct {
 
 type Person struct {
 	Id bson.ObjectId `bson:"_id"`
-	FirstName string `encrypted:"true" bson:"firstName"`
-	LastName string `encrypted:"true" bson:"lastName"`
+	FirstName string `bongo:"encrypted" bson:"firstName"`
+	LastName string `bongo:"encrypted" bson:"lastName"`
 	Gender string
-	HomeAddress Address `encrypted:"true" bson:"homeAddress"`
+	HomeAddress Address `bongo:"encrypted" bson:"homeAddress"`
 }
 ```
 
-### Indexing
+<!-- ### Indexing
 
 You can use tags to ensure indeces on your collections. The mere presence of an `index` tag will cause Bongo to ensure an index on that field when your model is registered. If `index` is `"unique"`, it will be a unique index.
 
 ```go
 type Person struct {
 	Id bson.ObjectId `bson:"_id"`
-	FirstName string `encrypted:"true" bson:"firstName"`
-	LastName string `encrypted:"true" bson:"lastName"`
-	Gender string `index:"true"`
+	FirstName string `bongo:"encrypted" bson:"firstName"`
+	LastName string `bongo:"encrypted" bson:"lastName"`
+	Gender string `bongo:"true"`
 }
 ```
 
@@ -87,7 +87,7 @@ To register your model, you should do the following at boot time. This will ensu
 
 ```go
 connection.Register(&Person{}, "people")
-```
+``` -->
 
 ### Hooks
 
@@ -97,7 +97,12 @@ You can add special methods to your struct that will automatically get called by
 * `func (s *ModelStruct) BeforeSave()`
 * `func (s *ModelStruct) BeforeCreate()`
 * `func (s *ModelStruct) BeforeUpdate()`
+* `func (s *ModelStruct) AfterSave()`
+* `func (s *ModelStruct) AfterCreate()`
+* `func (s *ModelStruct) AfterUpdate()`
 * `func (s *ModelStruct) AfterFind()`
+
+The create/update hooks run immediately before the save hooks.
 	
 ### Validation
 
@@ -119,7 +124,7 @@ myPerson := &Person{
 	LastName:"McGee",
 	Gender:"male",
 }
-err, validationErrs := connection.Save(myPerson)
+saveResult := connection.Save(myPerson)
 ```
 
 You will now have a new document in the `person` collection.
@@ -132,7 +137,7 @@ myPerson := &Person{
 	LastName:"McGee",
 	Gender:"male",
 }
-err, validationErrs := connection.Collection("people").Save(myPerson)
+saveResult := connection.Collection("people").Save(myPerson)
 ```
 
 Now you'll have a new document in the `people` collection.
@@ -234,4 +239,132 @@ if err != nil {
 }
 ```
 
+# Change Tracking
+If your model struct has a property `DiffTracker *bongo.DiffTracker`, it will automatically track changes to your model so you can compare the current values with the original. You need to set the diff tracker on your model using `bongo.NewDiffTracker(model)`, like so:
+```go
+type MyModel struct {
+	Id bson.ObjectId `bson:"_id"`
+	StringVal string
+	DiffTracker *bongo.DiffTracker
+}
+
+myModel := &MyModel{}
+myModel.DiffTracker = bongo.NewDiffTracker(myModel)
+```
+
+Use as follows:
+
+## Check if a field has been modified
+```go
+// Store the current state for comparison
+myModel.DiffTracker.Reset()
+
+// Change a property...
+myModel.StringVal = "foo"
+
+fmt.Println(myModel.DiffTracker.Modified("StringVal")) // true
+myModel.DiffTracker.Reset()
+fmt.Println(myModel.DiffTracker.Modified("StringVal")) // false
+```
+
+## Get all modified fields
+```go
+myModel.StringVal = "foo"
+// Store the current state for comparison
+myModel.DiffTracker.Reset()
+
+isNew, modifiedFields := myModel.GetModified()
+
+fmt.Println(isNew, modifiedFields) // false, ["StringVal"]
+myModel.DiffTracker.Reset()
+
+isNew, modifiedFields = myModel.GetModified()
+fmt.Println(isNew, modifiedFields) // false, []
+```
+
+
+# Cascade Save/Delete
+Bongo supports cascading portions of documents to related documents and the subsequent cleanup upon deletion. For example, if you have a `Team` collection, and each team has an array of `Players`, you can cascade a player's first name and last name to his or her `team.Players` array on save, and remove that element in the array if you delete the player.
+
+To use this feature, your struct needs to have an exported method called `GetCascade`, which returns an array of `*bongo.CascadeConfig`. Additionally, if you want to make use of the `OldQuery` property to remove references from previously related documents, you should probably alsotimplement the `DiffTracker` on your model struct (see above). 
+
+### Casade Configuration
+```go
+type CascadeConfig struct {
+	// The collection to cascade to
+	Collection *mgo.Collection
+
+	// The relation type (does the target doc have an array of these docs [REL_MANY] or just reference a single doc [REL_ONE])
+	RelType int
+
+	// The property on the related doc to populate
+	ThroughProp string
+
+	// The query to find related docs
+	Query bson.M
+
+	// The data that constructs the query may have changed - this is to remove self from previous relations
+	OldQuery bson.M
+
+	// Data to cascade. Can be in dot notation
+	Properties []string
+}
+```
+
+### Example
+```go
+func (c *Child) GetCascade() []*bongo.CascadeConfig {
+
+	cascadeSingle := &bongo.CascadeConfig{
+		Collection:  connection.Collection("parents").Collection(),
+		Properties:  []string{"name"},
+		ThroughProp: "child",
+		RelType:     bongo.REL_ONE,
+		Query: bson.M{
+			"_id": c.ParentId,
+		},
+	}
+
+	cascadeMulti := &bongo.CascadeConfig{
+		Collection:  connection.Collection("parents").Collection(),
+		Properties:  []string{"name"},
+		ThroughProp: "children",
+		RelType:     bongo.REL_MANY,
+		Query: bson.M{
+			"_id": c.ParentId,
+		},
+	}
+
+	if c.DiffTracker.Modified("ParentId") {
+
+		origId, _ := c.DiffTracker.GetOriginalValue("ParentId")
+		if origId != nil {
+			oldQuery := bson.M{
+				"_id": origId,
+			}
+			cascadeSingle.OldQuery = oldQuery
+			cascadeMulti.OldQuery = oldQuery
+		}
+
+	}
+
+	return []*bongo.CascadeConfig{cascadeSingle, cascadeMulti}
+}
+```
+
+This does the following:
+
+1) When you save a child, it will populate its parent's (defined by `cascadeSingle.Query`) `child` property with an object, consisting of one key/value pair (`name`)
+
+2) When you save a child, it will also modify its parent's (defined by `cascadeMulti.Query`) `children` array, either modifying or pushing to the array of key/value pairs, also with just `name`.
+
+3) When you delete a child, it will use `cascadeSingle.OldQuery` to remove the reference from its previous `parent.child`
+
+4) When you delete a child, it will also use `cascadeMulti.OldQuery` to remove the reference from its previous `parent.children`
+
+Note that the `ThroughProp` must be the actual field name in the database, not the property name on the struct.
+
+# Credits
+* Mongoose for inspiration
+* Mitchell Hashimoto for his mapstructure repo (https://github.com/mitchellh/mapstructure), the codec for which I shamelessly stole and modified instead of making my own
 

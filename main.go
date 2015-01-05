@@ -105,7 +105,6 @@ func (m *Connection) Register(mod interface{}, colName string) error {
 	// 	return nil
 	// }
 
-	log.Printf("Registering %s\n", colName)
 	collection := m.Collection(colName)
 
 	// Look at any indeces. For now we'll only support top level
@@ -126,14 +125,16 @@ func (m *Connection) Register(mod interface{}, colName string) error {
 		fieldName := typeOfT.Field(i).Name
 
 		// encrypt := stringInSlice(fieldName, encryptedFields)
-		index := typeOfT.Field(i).Tag.Get("index")
+		bongo := typeOfT.Field(i).Tag.Get("bongo")
+		tags := getBongoTags(bongo)
 
 		var bsonName string
 		bsonName = typeOfT.Field(i).Tag.Get("bson")
 		if len(bsonName) == 0 {
 			bsonName = strings.ToLower(fieldName)
 		}
-		if len(index) > 0 {
+
+		if tags.index {
 			idx := mgo.Index{
 				Key:        []string{bsonName},
 				Unique:     false,
@@ -142,7 +143,7 @@ func (m *Connection) Register(mod interface{}, colName string) error {
 				Sparse:     true,
 			}
 
-			if index == "unique" {
+			if tags.unique {
 				idx.Unique = true
 			}
 

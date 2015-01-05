@@ -2,13 +2,7 @@ package bongo
 
 import (
 	"encoding/json"
-	// "errors"
-	// "fmt"
-	// "github.com/fatih/structs"
-	// "github.com/mitchellh/mapstructure"
 	"github.com/oleiade/reflections"
-	// "labix.org/v2/mgo/bson"
-	"log"
 	"reflect"
 	"strings"
 )
@@ -28,6 +22,10 @@ func PrepDocumentForSave(key []byte, doc interface{}) map[string]interface{} {
 	var bsonName string
 	for fieldName, bsonTag := range fields {
 		bsonName = strings.Split(bsonTag, ",")[0]
+
+		if bsonName == "-" {
+			continue
+		}
 		if len(bsonName) == 0 {
 			bsonName = strings.ToLower(fieldName)
 		}
@@ -36,6 +34,10 @@ func PrepDocumentForSave(key []byte, doc interface{}) map[string]interface{} {
 		bongoTags := getBongoTags(tag)
 		val, _ := reflections.GetField(doc, fieldName)
 
+		// Skip if it's populated via cascade
+		if bongoTags.cascaded {
+			continue
+		}
 		// Special types: bson.ObjectId, []bson.ObjectId,
 		if bongoTags.encrypted {
 			bytes, err := json.Marshal(val)
@@ -62,7 +64,6 @@ func PrepDocumentForSave(key []byte, doc interface{}) map[string]interface{} {
 
 				// Recurse only if not nil
 				if t.Kind() == reflect.Struct || !rval.IsNil() {
-					log.Println("Recursing", bsonName, val)
 					returnMap[bsonName] = PrepDocumentForSave(key, val)
 				}
 				// }

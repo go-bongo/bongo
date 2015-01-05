@@ -2,7 +2,6 @@ package bongo
 
 import (
 	// "encoding/json"
-	"fmt"
 	. "gopkg.in/check.v1"
 	"labix.org/v2/mgo/bson"
 	// "testing"
@@ -50,7 +49,6 @@ func (s *TestSuite) TestEncryptInitializeDocumentFromDB(c *C) {
 		// UnencryptedArr: []string{"foo", "bar"},
 	}
 
-	fmt.Println(p)
 	/**
 	 * @type map[string]interface{}
 	 */
@@ -66,7 +64,6 @@ func (s *TestSuite) TestEncryptInitializeDocumentFromDB(c *C) {
 
 	newP := new(Person)
 
-	fmt.Println(encrypted)
 	InitializeDocumentFromDB(key, encrypted, newP)
 
 	// Encrypted structs should be converted from JSON string to the actual struct

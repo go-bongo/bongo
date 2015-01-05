@@ -1,5 +1,6 @@
 //
-// ORIGINAL CODE BY mitchellh (https://github.com/mitchellh/mapstructure)
+// ORIGINAL CODE BY Mitchell Hashimoto (https://github.com/mitchellh/mapstructure)
+// Copyright (c) 2013 Mitchell Hashimoto
 // LICENSE: MIT (https://github.com/mitchellh/mapstructure/blob/master/LICENSE)
 // Modified for use in Bongo w/ encryption, etc.
 //

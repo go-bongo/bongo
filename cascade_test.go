@@ -3,18 +3,17 @@ package bongo
 import (
 	. "gopkg.in/check.v1"
 	"labix.org/v2/mgo/bson"
-	"log"
+	// "log"
 )
 
 type Parent struct {
-	Id       bson.ObjectId `bson:"_id"`
-	Name     string
-	Number   int
-	Children []*ChildRef
-	Child    *ChildRef
+	Id          bson.ObjectId `bson:"_id"`
+	Name        string
+	Number      int
+	Children    []*ChildRef
+	Child       *ChildRef
+	DiffTracker *DiffTracker `bson:"-" json:"-"`
 }
-
-var checker = NewChangeChecker()
 
 func (c *Child) GetCascade() []*CascadeConfig {
 
@@ -38,14 +37,17 @@ func (c *Child) GetCascade() []*CascadeConfig {
 		},
 	}
 
-	if checker.Modified(c.Id, "ParentId", c) {
-		log.Println("Modified parentid")
-		origId, _ := checker.GetOriginalValue(c.Id, "ParentId")
-		oldQuery := bson.M{
-			"_id": origId,
+	if c.DiffTracker.Modified("ParentId") {
+
+		origId, _ := c.DiffTracker.GetOriginalValue("ParentId")
+		if origId != nil {
+			oldQuery := bson.M{
+				"_id": origId,
+			}
+			cascadeSingle.OldQuery = oldQuery
+			cascadeMulti.OldQuery = oldQuery
 		}
-		cascadeSingle.OldQuery = oldQuery
-		cascadeMulti.OldQuery = oldQuery
+
 	}
 
 	return []*CascadeConfig{cascadeSingle, cascadeMulti}
@@ -55,6 +57,8 @@ type Child struct {
 	Id       bson.ObjectId `bson:"_id"`
 	ParentId bson.ObjectId
 	Name     string
+	// System will automatically instantate the tracker
+	DiffTracker *DiffTracker `bson:"-" json:"-"`
 }
 
 type ChildRef struct {
@@ -73,39 +77,30 @@ func (s *TestSuite) TestCascade(c *C) {
 		Number: 5,
 	}
 
+	parent.DiffTracker = NewDiffTracker(parent)
+
 	parent2 := &Parent{
 		Name:   "Other Parent",
 		Number: 10,
 	}
+	parent2.DiffTracker = NewDiffTracker(parent2)
 
 	res := collection.Save(parent)
 
 	c.Assert(res.Success, Equals, true)
-	checker.StoreOriginal(parent.Id, parent)
 	res = collection.Save(parent2)
 	c.Assert(res.Success, Equals, true)
-	checker.StoreOriginal(parent2.Id, parent2)
 
 	child := &Child{
 		ParentId: parent.Id,
 		Name:     "Foo McGoo",
 	}
 
+	child.DiffTracker = NewDiffTracker(child)
+
 	res = childCollection.Save(child)
 	c.Assert(res.Success, Equals, true)
 
-	checker.StoreOriginal(child.Id, child)
-
-	// Cascade the parent
-	prepped := PrepDocumentForSave(key, child)
-
-	CascadeSave(child, prepped)
-
-	// Get the child
-	// newChild := &Child{
-	// 	Parent: &ParentRef{},
-	// }
-	//
 	newParent := &Parent{}
 	collection.FindById(parent.Id, newParent)
 	c.Assert(newParent.Child.Name, Equals, "Foo McGoo")
@@ -115,10 +110,12 @@ func (s *TestSuite) TestCascade(c *C) {
 
 	// Now change the child parent Id...
 	child.ParentId = parent2.Id
+	c.Assert(child.DiffTracker.Modified("ParentId"), Equals, true)
+
 	res = childCollection.Save(child)
 	c.Assert(res.Success, Equals, true)
-	prepped = PrepDocumentForSave(key, child)
-	CascadeSave(child, prepped)
+	// Now make sure it says the parent id DIDNT change, because we just saved it
+	c.Assert(child.DiffTracker.Modified("ParentId"), Equals, false)
 
 	newParent1 := &Parent{}
 	collection.FindById(parent.Id, newParent1)
@@ -132,8 +129,8 @@ func (s *TestSuite) TestCascade(c *C) {
 	c.Assert(newParent2.Children[0].Id.Hex(), Equals, child.Id.Hex())
 
 	newParent3 := &Parent{}
-	// Now delete it
-	CascadeDelete(child)
+	err := childCollection.Delete(child)
+	c.Assert(err, Equals, nil)
 	collection.FindById(parent2.Id, newParent3)
 	c.Assert(newParent3.Child, IsNil)
 	c.Assert(len(newParent3.Children), Equals, 0)

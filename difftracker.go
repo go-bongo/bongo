@@ -4,30 +4,33 @@ import (
 	"errors"
 	"fmt"
 	"github.com/maxwellhealth/dotaccess"
-	"labix.org/v2/mgo/bson"
+	// "labix.org/v2/mgo/bson"
+	// "log"
 	"reflect"
 	"strings"
 )
 
-type ChangeChecker struct {
-	originals map[bson.ObjectId]interface{}
+type DiffTracker struct {
+	original interface{}
+	current  interface{}
 }
 
-func NewChangeChecker() *ChangeChecker {
-	c := &ChangeChecker{}
-
-	c.originals = make(map[bson.ObjectId]interface{})
+func NewDiffTracker(doc interface{}) *DiffTracker {
+	c := &DiffTracker{
+		current:  doc,
+		original: nil,
+	}
 
 	return c
 }
 
-func (c *ChangeChecker) StoreOriginal(id bson.ObjectId, doc interface{}) {
-	// Store a copy
-	c.originals[id] = reflect.Indirect(reflect.ValueOf(doc)).Interface()
+func (c *DiffTracker) Reset() {
+	// Store a copy of current
+	c.original = reflect.Indirect(reflect.ValueOf(c.current)).Interface()
 }
 
-func (c *ChangeChecker) Modified(id bson.ObjectId, field string, newDoc interface{}) bool {
-	isNew, diffs, _ := c.Compare(id, newDoc)
+func (c *DiffTracker) Modified(field string) bool {
+	isNew, diffs, _ := c.Compare()
 
 	if isNew {
 		return true
@@ -36,21 +39,34 @@ func (c *ChangeChecker) Modified(id bson.ObjectId, field string, newDoc interfac
 	}
 }
 
-func (c *ChangeChecker) GetOriginalValue(id bson.ObjectId, field string) (interface{}, error) {
-	if orig, ok := c.originals[id]; ok {
-		return dotaccess.Get(orig, field)
-	} else {
-		return nil, nil
+func (c *DiffTracker) GetModified() (bool, []string) {
+	isNew, diffs, _ := c.Compare()
+
+	return isNew, diffs
+}
+
+func (c *DiffTracker) GetOriginalValue(field string) (interface{}, error) {
+	if c.original != nil {
+		return dotaccess.Get(c.original, field)
 	}
+	return nil, nil
+
 }
 
-func (c *ChangeChecker) Clear() {
-	c.originals = make(map[bson.ObjectId]interface{})
+func (c *DiffTracker) Clear() {
+	c.original = nil
 }
 
-func (c *ChangeChecker) Compare(id bson.ObjectId, newDoc interface{}) (bool, []string, error) {
-	if orig, ok := c.originals[id]; ok {
-		diffs, err := getChangedFields(orig, newDoc)
+func (c *DiffTracker) Compare() (bool, []string, error) {
+	defer func() {
+
+		if r := recover(); r != nil {
+			fmt.Println("You probably forgot to initialize the DiffTracker instance on your model")
+			panic(r)
+		}
+	}()
+	if c.original != nil {
+		diffs, err := getChangedFields(c.original, c.current)
 		return false, diffs, err
 	} else {
 		return true, []string{}, nil
@@ -96,6 +112,11 @@ func getChangedFields(struct1 interface{}, struct2 interface{}) ([]string, error
 			childType = childType.Elem()
 		}
 
+		// Skip if not exported
+		if len(field.PkgPath) > 0 || field.Name == "DiffTracker" {
+			continue
+		}
+
 		if childType.Kind() == reflect.Struct {
 			childDiffs, err := getChangedFields(field1.Interface(), field2.Interface())
 
@@ -109,7 +130,6 @@ func getChangedFields(struct1 interface{}, struct2 interface{}) ([]string, error
 				}
 			}
 		} else {
-			fmt.Println("Comparing", field1.Interface(), "to", field2.Interface())
 			if field1.Interface() != field2.Interface() {
 				diffs = append(diffs, fieldName)
 			}
