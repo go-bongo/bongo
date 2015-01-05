@@ -9,7 +9,7 @@ type ResultSet struct {
 	Query      *mgo.Query
 	Iter       *mgo.Iter
 	loadedIter bool
-	Connection *Connection
+	Collection *Collection
 }
 
 type PaginationInfo struct {
@@ -21,7 +21,6 @@ type PaginationInfo struct {
 }
 
 func (r *ResultSet) Next(mod interface{}) bool {
-	colname := getCollectionName(mod)
 	returnMap := make(map[string]interface{})
 
 	// Check if the iter has been instantiated yet
@@ -33,7 +32,7 @@ func (r *ResultSet) Next(mod interface{}) bool {
 	gotResult := r.Iter.Next(returnMap)
 
 	if gotResult {
-		InitializeDocumentFromDB(r.Connection.GetEncryptionKey(colname), returnMap, mod)
+		r.Collection.InitializeDocumentFromDB(returnMap, mod)
 		return true
 	}
 

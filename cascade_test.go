@@ -8,10 +8,10 @@ import (
 
 type Parent struct {
 	Id          bson.ObjectId `bson:"_id"`
-	Name        string
+	Name        string        `bongo:"encrypted"`
 	Number      int
-	Children    []*ChildRef
-	Child       *ChildRef
+	Children    []*ChildRef  `bongo:"cascadedFrom=children"`
+	Child       *ChildRef    `bongo:"cascadedFrom=children"`
 	DiffTracker *DiffTracker `bson:"-" json:"-"`
 }
 
@@ -56,19 +56,24 @@ func (c *Child) GetCascade() []*CascadeConfig {
 type Child struct {
 	Id       bson.ObjectId `bson:"_id"`
 	ParentId bson.ObjectId
-	Name     string
+	Name     string `bongo:"encrypted"`
 	// System will automatically instantate the tracker
 	DiffTracker *DiffTracker `bson:"-" json:"-"`
 }
 
 type ChildRef struct {
 	Id   bson.ObjectId `bson:"_id,omitempty"`
-	Name string
+	Name string        `bongo:"encrypted"`
 }
 
 func (s *TestSuite) TestCascade(c *C) {
 
 	collection := connection.Collection("parents")
+
+	connection.Config.EncryptionKeyPerCollection = map[string]string{
+		"parents":  "asdf1234asdf1234",
+		"children": "1234asdf1234asdf",
+	}
 
 	childCollection := connection.Collection("children")
 

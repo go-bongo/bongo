@@ -51,8 +51,8 @@ func appendErrors(errors []string, err error) []string {
 
 // DecodeHookFunc is the callback function that can be used for
 // data transformations. See "DecodeHook" in the DecoderConfig
-// struct.
-type DecodeHookFunc func(from interface{}, to reflect.Value, currentField *reflect.StructField) (interface{}, error)
+// struct. Return false for second argument to skip decoding
+type DecodeHookFunc func(from interface{}, to reflect.Value, decoder *Decoder) (interface{}, error)
 
 // DecoderConfig is the configuration that is used to create a new decoder
 // and allows customization of various aspects of decoding.
@@ -108,6 +108,12 @@ type Decoder struct {
 
 	// In case the decoder hook needs to look at tags or something else, it's all here
 	CurrentField *reflect.StructField
+
+	CascadedFrom string
+
+	inArrayWithCascadedFrom bool
+
+	InEncryptedProp bool
 }
 
 // Metadata contains information about decoding a structure that
@@ -215,7 +221,7 @@ func (d *Decoder) decode(name string, data interface{}, val reflect.Value) error
 	if d.config.DecodeHook != nil {
 		// We have a DecodeHook, so let's pre-process the data.
 		var err error
-		data, err = d.config.DecodeHook(data, val, d.CurrentField)
+		data, err = d.config.DecodeHook(data, val, d)
 		if err != nil {
 			return err
 		}
@@ -223,10 +229,6 @@ func (d *Decoder) decode(name string, data interface{}, val reflect.Value) error
 
 	var err error
 	dataKind := getKind(val)
-	// Reset current field
-	if dataKind != reflect.Struct {
-		d.CurrentField = new(reflect.StructField)
-	}
 
 	switch dataKind {
 	case reflect.Bool:
@@ -451,6 +453,17 @@ func (d *Decoder) decodeFloat(name string, data interface{}, val reflect.Value) 
 }
 
 func (d *Decoder) decodeMap(name string, data interface{}, val reflect.Value) error {
+	tags := d.CurrentField.Tag.Get("bongo")
+
+	fieldIsEncrypted := false
+	if len(tags) > 0 {
+		config := getBongoTags(tags)
+		if config.encrypted {
+			fieldIsEncrypted = true
+			d.InEncryptedProp = true
+		}
+	}
+
 	valType := val.Type()
 	valKeyType := valType.Key()
 	valElemType := valType.Elem()
@@ -500,6 +513,10 @@ func (d *Decoder) decodeMap(name string, data interface{}, val reflect.Value) er
 	// Set the built up map to the value
 	val.Set(valMap)
 
+	if fieldIsEncrypted {
+		d.InEncryptedProp = false
+	}
+
 	// If we had errors, return those
 	if len(errors) > 0 {
 		return &CodecError{errors}
@@ -523,6 +540,21 @@ func (d *Decoder) decodePtr(name string, data interface{}, val reflect.Value) er
 }
 
 func (d *Decoder) decodeSlice(name string, data interface{}, val reflect.Value) error {
+	tags := d.CurrentField.Tag.Get("bongo")
+	fieldIsEncrypted := false
+	if len(tags) > 0 {
+		config := getBongoTags(tags)
+		if len(config.cascadedFrom) > 0 {
+			d.CascadedFrom = config.cascadedFrom
+			d.inArrayWithCascadedFrom = true
+		}
+		if config.encrypted {
+			fieldIsEncrypted = true
+			d.InEncryptedProp = true
+		}
+
+	}
+
 	dataVal := reflect.Indirect(reflect.ValueOf(data))
 	dataValKind := dataVal.Kind()
 	valType := val.Type()
@@ -560,6 +592,12 @@ func (d *Decoder) decodeSlice(name string, data interface{}, val reflect.Value) 
 	// Finally, set the value to the slice we built up
 	val.Set(valSlice)
 
+	d.inArrayWithCascadedFrom = false
+	d.CascadedFrom = ""
+
+	if fieldIsEncrypted {
+		d.InEncryptedProp = false
+	}
 	// If there were errors, we return those
 	if len(errors) > 0 {
 		return &CodecError{errors}
@@ -569,6 +607,19 @@ func (d *Decoder) decodeSlice(name string, data interface{}, val reflect.Value) 
 }
 
 func (d *Decoder) decodeStruct(name string, data interface{}, val reflect.Value) error {
+	// Get the tags, check cascadedFrom
+	tags := d.CurrentField.Tag.Get("bongo")
+	fieldIsEncrypted := false
+	if len(tags) > 0 {
+		config := getBongoTags(tags)
+		if len(config.cascadedFrom) > 0 && !d.inArrayWithCascadedFrom {
+			d.CascadedFrom = config.cascadedFrom
+		}
+		if config.encrypted {
+			fieldIsEncrypted = true
+			d.InEncryptedProp = true
+		}
+	}
 	dataVal := reflect.Indirect(reflect.ValueOf(data))
 	dataValKind := dataVal.Kind()
 
@@ -576,6 +627,15 @@ func (d *Decoder) decodeStruct(name string, data interface{}, val reflect.Value)
 	if dataValKind == reflect.Struct {
 		// fmt.Println(name, "Is already a struct")
 		val.Set(dataVal)
+
+		// Reset cascadedFrom so we use the root-level collection name for encryption key detection
+		if !d.inArrayWithCascadedFrom {
+			d.CascadedFrom = ""
+		}
+
+		if fieldIsEncrypted {
+			d.InEncryptedProp = false
+		}
 		return nil
 	}
 	if dataValKind != reflect.Map {
@@ -715,6 +775,15 @@ func (d *Decoder) decodeStruct(name string, data interface{}, val reflect.Value)
 
 		err := fmt.Errorf("'%s' has invalid keys: %s", name, strings.Join(keys, ", "))
 		errors = appendErrors(errors, err)
+	}
+
+	// Reset cascadedFrom so we use the root-level collection name for encryption key detection
+	if !d.inArrayWithCascadedFrom {
+		d.CascadedFrom = ""
+	}
+
+	if fieldIsEncrypted {
+		d.InEncryptedProp = false
 	}
 
 	if len(errors) > 0 {

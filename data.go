@@ -8,7 +8,7 @@ import (
 )
 
 // Encrypts fields on a document
-func PrepDocumentForSave(key []byte, doc interface{}) map[string]interface{} {
+func (c *Collection) PrepDocumentForSave(doc interface{}) map[string]interface{} {
 	// defer func() {
 	// 	if r := recover(); r != nil {
 	// 		// return doc
@@ -18,6 +18,8 @@ func PrepDocumentForSave(key []byte, doc interface{}) map[string]interface{} {
 	returnMap := make(map[string]interface{})
 
 	fields, _ := reflections.Tags(doc, "bson")
+
+	key := c.GetEncryptionKey()
 
 	var bsonName string
 	for fieldName, bsonTag := range fields {
@@ -35,7 +37,7 @@ func PrepDocumentForSave(key []byte, doc interface{}) map[string]interface{} {
 		val, _ := reflections.GetField(doc, fieldName)
 
 		// Skip if it's populated via cascade
-		if bongoTags.cascaded {
+		if len(bongoTags.cascadedFrom) > 0 {
 			continue
 		}
 		// Special types: bson.ObjectId, []bson.ObjectId,
@@ -54,28 +56,13 @@ func PrepDocumentForSave(key []byte, doc interface{}) map[string]interface{} {
 		} else {
 			t := reflect.TypeOf(val)
 			rval := reflect.ValueOf(val)
-			// May need to iterate over sub documents with their own bson/encryption settings
+			// May need to iterate over sub documents with their own bson/encryption settings. It won't be a separate encryption key since it's not cascaded (that will be skipped above if bongoTags.cascaded)
 			if shouldRecurse(t) {
-				// Is it a time? Allow it through if so.
-				// if string(f.Type().Name()) == "Time" {
-				// 	returnMap[bsonName] = structs.Map(f.Interface())
-				// } else {
-				// 	// iterate
 
 				// Recurse only if not nil
 				if t.Kind() == reflect.Struct || !rval.IsNil() {
-					returnMap[bsonName] = PrepDocumentForSave(key, val)
+					returnMap[bsonName] = c.PrepDocumentForSave(val)
 				}
-				// }
-
-				// } else if id, ok := f.Interface().(bson.ObjectId); ok {
-
-				// 	// Skip invalid objectIds - these should be validated if they're needed, but otherwise they should just be nil
-				// 	if id.Valid() {
-				// 		returnMap[bsonName] = id
-				// 	} else {
-				// 		returnMap[bsonName] = nil
-				// 	}
 			} else {
 				returnMap[bsonName] = val
 			}
@@ -112,14 +99,14 @@ func shouldRecurse(t reflect.Type) bool {
 }
 
 type bongoTags struct {
-	encrypted bool
-	index     bool
-	unique    bool
-	cascaded  bool
+	encrypted    bool
+	index        bool
+	unique       bool
+	cascadedFrom string
 }
 
 func getBongoTags(tag string) *bongoTags {
-	ret := &bongoTags{false, false, false, false}
+	ret := &bongoTags{false, false, false, ""}
 
 	tags := strings.Split(tag, ",")
 
@@ -135,10 +122,13 @@ func getBongoTags(tag string) *bongoTags {
 		ret.unique = true
 	}
 
-	if stringInSlice("cascaded", tags) {
-		ret.cascaded = true
+	// Check for cascadedFrom so we know how to decrypt
+	for _, t := range tags {
+		if strings.HasPrefix(t, "cascadedFrom=") {
+			ret.cascadedFrom = strings.TrimPrefix(t, "cascadedFrom=")
+			break
+		}
 	}
-
 	return ret
 
 }
@@ -153,19 +143,33 @@ func getBongoTags(tag string) *bongoTags {
 // }
 
 // Decrypt a struct. Use tag `encrypted="true"` to designate fields as needing to be decrypted
-func InitializeDocumentFromDB(key []byte, encrypted map[string]interface{}, doc interface{}) {
-	decoderHook := func(data interface{}, to reflect.Value, currentField *reflect.StructField) (interface{}, error) {
-		// dataVal := reflect.ValueOf(data)
+func (c *Collection) InitializeDocumentFromDB(encrypted map[string]interface{}, doc interface{}) {
 
+	decoderHook := func(data interface{}, to reflect.Value, decoder *Decoder) (interface{}, error) {
+		// If we're inside an encrypted prop, that means it's already been json-decoded and is just being marshaled into its final value. In that case we don't even care, so just let it go through (you can't have nested encryption)
+		if decoder.InEncryptedProp {
+			return data, nil
+		}
+		currentField := decoder.CurrentField
+
+		// log.Println("Current field:", currentField)
 		if len(currentField.Tag) > 0 {
+
+			colName := c.Name
+			if len(decoder.CascadedFrom) > 0 {
+				colName = decoder.CascadedFrom
+			}
+
 			// Check bongo fields
 			bongoConfig := getBongoTags(currentField.Tag.Get("bongo"))
 			// log.Println("Decoding", dataVal, to)
 			if bongoConfig.encrypted {
 				// Decrypt it
+				key := c.Connection.GetEncryptionKey(colName)
+				// key := c.Connection.GetEncryptionKey("asdf1234asdf1234")
+
 				if str, ok := data.(string); ok {
 					decrypted, err := Decrypt(key, str)
-					// log.Println("Decrypting", str)
 					if err != nil {
 						panic(err)
 					}

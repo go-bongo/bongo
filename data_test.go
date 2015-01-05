@@ -52,7 +52,9 @@ func (s *TestSuite) TestEncryptInitializeDocumentFromDB(c *C) {
 	/**
 	 * @type map[string]interface{}
 	 */
-	encrypted := PrepDocumentForSave(key, p)
+	collection := connection.Collection("people")
+
+	encrypted := collection.PrepDocumentForSave(p)
 
 	// Name should be a string, encrypted from the json encoding of the Name struct
 	c.Assert(encrypted["name"], Not(Equals), "Jason")
@@ -64,7 +66,7 @@ func (s *TestSuite) TestEncryptInitializeDocumentFromDB(c *C) {
 
 	newP := new(Person)
 
-	InitializeDocumentFromDB(key, encrypted, newP)
+	collection.InitializeDocumentFromDB(encrypted, newP)
 
 	// Encrypted structs should be converted from JSON string to the actual struct
 	c.Assert(newP.Name.First, Equals, "Jason")
@@ -101,11 +103,11 @@ func encryptInitializeDocumentFromDB() {
 		Phone:  "555-555-5555",
 		Number: 5,
 	}
-
-	encrypted := PrepDocumentForSave(key, p)
+	collection := connection.Collection("people")
+	encrypted := collection.PrepDocumentForSave(p)
 	newP := new(Person)
 
-	InitializeDocumentFromDB(key, encrypted, newP)
+	collection.InitializeDocumentFromDB(encrypted, newP)
 }
 func (s *TestSuite) TestEncryptInitializeWithMissingValues(c *C) {
 	encryptInitializeDocumentFromDB()

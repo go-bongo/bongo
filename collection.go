@@ -17,6 +17,10 @@ type Collection struct {
 	Connection *Connection
 }
 
+func (c *Collection) GetEncryptionKey() []byte {
+	return c.Connection.GetEncryptionKey(c.Name)
+}
+
 func (c *Collection) Collection() *mgo.Collection {
 	return c.Connection.Session.DB(c.Connection.Config.Database).C(c.Name)
 }
@@ -96,7 +100,7 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 	}
 
 	// 3) Convert the model into a map using the crypt library
-	modelMap := PrepDocumentForSave(c.Connection.GetEncryptionKey(c.Name), mod)
+	modelMap := c.PrepDocumentForSave(mod)
 
 	// 4) Cascade?
 	CascadeSave(mod, modelMap)
@@ -159,7 +163,7 @@ func (c *Collection) FindById(id bson.ObjectId, mod interface{}) error {
 
 	// Decrypt + Marshal into map
 
-	InitializeDocumentFromDB(c.Connection.GetEncryptionKey(c.Name), returnMap, mod)
+	c.InitializeDocumentFromDB(returnMap, mod)
 
 	if hook, ok := mod.(interface {
 		AfterFind()
@@ -178,7 +182,7 @@ func (c *Collection) Find(query interface{}) *ResultSet {
 	resultset := new(ResultSet)
 
 	resultset.Query = q
-	resultset.Connection = c.Connection
+	resultset.Collection = c
 
 	return resultset
 }
