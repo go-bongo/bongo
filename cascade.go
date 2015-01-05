@@ -10,11 +10,13 @@ import (
 	// "strings"
 )
 
-const ( // iota is reset to 0
-	REL_MANY = iota // c0 == 0
-	REL_ONE  = iota // c1 == 1
+// Relation types (one-to-many or one-to-one)
+const (
+	REL_MANY = iota
+	REL_ONE  = iota
 )
 
+// Configuration to tell Bongo how to cascade data to related documents on save or delete
 type CascadeConfig struct {
 	// The collection to cascade to
 	Collection *mgo.Collection
@@ -45,11 +47,12 @@ func CascadeSave(doc interface{}, preparedForSave map[string]interface{}) {
 		toCascade := conv.GetCascade()
 
 		for _, conf := range toCascade {
-			CascadeSaveWithConfig(conf, preparedForSave)
+			cascadeSaveWithConfig(conf, preparedForSave)
 		}
 	}
 }
 
+// Deletes references to a document from its related documents
 func CascadeDelete(doc interface{}) {
 	// Find out which properties to cascade
 	if conv, ok := doc.(interface {
@@ -67,14 +70,15 @@ func CascadeDelete(doc interface{}) {
 		// Cast as bson.ObjectId
 		if bsonId, ok := id.(bson.ObjectId); ok {
 			for _, conf := range toCascade {
-				CascadeDeleteWithConfig(conf, bsonId)
+				cascadeDeleteWithConfig(conf, bsonId)
 			}
 		}
 
 	}
 }
 
-func CascadeDeleteWithConfig(conf *CascadeConfig, id bson.ObjectId) (*mgo.ChangeInfo, error) {
+// Runs a cascaded delete operation with one configuration
+func cascadeDeleteWithConfig(conf *CascadeConfig, id bson.ObjectId) (*mgo.ChangeInfo, error) {
 	switch conf.RelType {
 	case REL_ONE:
 		update := map[string]map[string]interface{}{
@@ -98,7 +102,8 @@ func CascadeDeleteWithConfig(conf *CascadeConfig, id bson.ObjectId) (*mgo.Change
 	return &mgo.ChangeInfo{}, errors.New("Invalid relation type")
 }
 
-func CascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]interface{}) (*mgo.ChangeInfo, error) {
+// Runs a cascaded save operation with one configuration
+func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]interface{}) (*mgo.ChangeInfo, error) {
 	// Create a new map with just the props to cascade
 
 	id := preparedForSave["_id"]
