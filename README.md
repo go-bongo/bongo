@@ -289,6 +289,8 @@ Bongo supports cascading portions of documents to related documents and the subs
 
 To use this feature, your struct needs to have an exported method called `GetCascade`, which returns an array of `*bongo.CascadeConfig`. Additionally, if you want to make use of the `OldQuery` property to remove references from previously related documents, you should probably alsotimplement the `DiffTracker` on your model struct (see above). 
 
+On the struct properties that are cascaded from related documents, you need to tell Mongo not to save them, and how to decrypt them. (The related collection could have a different encryption key). To do this, use the `cascadedFrom={collectionName}` bongo tag, like so `bongo:"cascadedFrom=children"`. This will tell Bongo not to save those fields when you save your model (since they are supposed to be populated by the related documents), and also to decrypt those fields using the encryption key for the "children" collection, rather than the main model's collection.
+
 ### Casade Configuration
 ```go
 type CascadeConfig struct {
