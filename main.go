@@ -20,6 +20,7 @@ type Config struct {
 	Database                   string
 	EncryptionKey              string
 	EncryptionKeyPerCollection map[string]string
+	DisableEncryption          bool
 }
 
 type SaveResult struct {

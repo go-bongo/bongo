@@ -41,7 +41,7 @@ func (c *Collection) PrepDocumentForSave(doc interface{}) map[string]interface{}
 			continue
 		}
 		// Special types: bson.ObjectId, []bson.ObjectId,
-		if bongoTags.encrypted {
+		if bongoTags.encrypted && !c.Connection.Config.DisableEncryption {
 			bytes, err := json.Marshal(val)
 			if err != nil {
 				panic(err)
@@ -146,6 +146,9 @@ func getBongoTags(tag string) *bongoTags {
 func (c *Collection) InitializeDocumentFromDB(encrypted map[string]interface{}, doc interface{}) {
 
 	decoderHook := func(data interface{}, to reflect.Value, decoder *Decoder) (interface{}, error) {
+		if c.Connection.Config.DisableEncryption {
+			return data, nil
+		}
 		// If we're inside an encrypted prop, that means it's already been json-decoded and is just being marshaled into its final value. In that case we don't even care, so just let it go through (you can't have nested encryption)
 		if decoder.InEncryptedProp {
 			return data, nil
