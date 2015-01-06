@@ -71,16 +71,17 @@ type Person struct {
 }
 ```
 
-<!-- ### Indexing
+### Indexing
 
-You can use tags to ensure indeces on your collections. The mere presence of an `index` tag will cause Bongo to ensure an index on that field when your model is registered. If `index` is `"unique"`, it will be a unique index.
+You can use tags to ensure indeces on your collections. The mere presence of an `index` tag will cause Bongo to ensure an index on that field when your model is registered. If you also have the "unique" tag, it will be a unique index.
 
 ```go
 type Person struct {
 	Id bson.ObjectId `bson:"_id"`
 	FirstName string `bongo:"encrypted" bson:"firstName"`
 	LastName string `bongo:"encrypted" bson:"lastName"`
-	Gender string `bongo:"true"`
+	Gender string `bongo:"index"`
+	Email string `bongo:"index,unique"`
 }
 ```
 
@@ -88,7 +89,7 @@ To register your model, you should do the following at boot time. This will ensu
 
 ```go
 connection.Register(&Person{}, "people")
-``` -->
+```
 
 #### Hooks
 
