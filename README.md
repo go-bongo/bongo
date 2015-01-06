@@ -1,9 +1,10 @@
 # What's Bongo?
-We couldn't find a good ODM for MongoDB written in Go, so we made one. Bongo is a wrapper for mgo (https://github.com/go-mgo/mgo) that adds ODM and hook functionality to its standard Mongo functions. It's pretty basic for now, but we are adding features constantly. 
+We couldn't find a good ODM for MongoDB written in Go, so we made one. Bongo is a wrapper for mgo (https://github.com/go-mgo/mgo) that adds ODM, hooks, validation, cascade support, and HIPAA-compliant encryption to its standard Mongo functions.
 
 # Usage
 
-## Import the Library
+## Basic Usage
+### Import the Library
 `go get github.com/maxwellhealth/bongo`
 
 `import "github.com/maxwellhealth/bongo"`
@@ -12,7 +13,7 @@ And install dependencies:
 
 `cd $GOHOME/src/github.com/maxwellhealth/bongo && go get .`
 
-## Connect to a Database
+### Connect to a Database
 
 Create a new `bongo.Config` instance:
 
@@ -34,7 +35,7 @@ connection := bongo.Connect(config)
 
 If you need to, you can access the raw `mgo` session with `connection.Session`
 
-## Create a Model
+### Create a Model
 
 Any struct can be used as a model as long as it has an Id property with type `bson.ObjectId` (from `mgo/bson`). `bson` tags are passed through to mgo. You can specify a field as being encrypted using `bongo:"encrypted"`
 
@@ -89,7 +90,7 @@ To register your model, you should do the following at boot time. This will ensu
 connection.Register(&Person{}, "people")
 ``` -->
 
-### Hooks
+#### Hooks
 
 You can add special methods to your struct that will automatically get called by bongo during certain actions. Currently available hooks are:
 
@@ -104,7 +105,7 @@ You can add special methods to your struct that will automatically get called by
 
 The create/update hooks run immediately before the save hooks.
 	
-### Validation
+#### Validation
 
 Use the `Validate()` hook to validate your model. If you return a slice with at least one element, the `Save()` method will fail. Bongo comes with some built-in validation methods:
 
@@ -114,7 +115,7 @@ Use the `Validate()` hook to validate your model. If you return a slice with at 
 
 You can obviously use your own validation as long as you add elements to the returned `[]string`
 
-## Saving Models
+### Saving Models
 
 Bongo can intelligently guess the name of the collection using the name of the struct you pass. (e.g. "FooBar" would go in as "foo_bar"). If you're OK with that, you can save directly via your connection:
 
@@ -142,7 +143,7 @@ saveResult := connection.Collection("people").Save(myPerson)
 
 Now you'll have a new document in the `people` collection.
 
-## Deleting Models
+### Deleting Models
 
 Same deal as save.
 
@@ -158,7 +159,7 @@ err := connection.Collection("people").Delete(person)
 ```
 
 
-## Find by ID
+### Find by ID
 
 Same thing applies re: collection name. This will look in "person" and populate the reference of `person`:
 
@@ -184,7 +185,7 @@ person := new(Person)
 err := connection.Collection("people").FindById(bson.ObjectIdHex(StringId), person)
 ```
 
-## Find
+### Find
 
 Find's a bit different - it's not a direct operation on a model reference so you can either call it directly on the `bongo.Connection`, passing either a sample struct or the collection name as the second argument so it knows which collection look in. You can also call `Collection.Find`, in which case you will only have to pass one argument (the query).
 
@@ -214,7 +215,7 @@ To paginate, you can run `Paginate(perPage int, currentPage int)` on the result 
 
 To use additional functions like `sort`, you can access the underlying mgo `Query` via `ResultSet.Query`.
 
-## Find One
+### Find One
 Same as find, but it will populate the reference of the struct you provide as the second argument. If there is no document found, you will get an error:
 
 
@@ -239,7 +240,7 @@ if err != nil {
 }
 ```
 
-# Change Tracking
+## Change Tracking
 If your model struct has a property `DiffTracker *bongo.DiffTracker`, it will automatically track changes to your model so you can compare the current values with the original. You need to set the diff tracker on your model using `bongo.NewDiffTracker(model)`, like so:
 ```go
 type MyModel struct {
@@ -254,7 +255,7 @@ myModel.DiffTracker = bongo.NewDiffTracker(myModel)
 
 Use as follows:
 
-## Check if a field has been modified
+### Check if a field has been modified
 ```go
 // Store the current state for comparison
 myModel.DiffTracker.Reset()
@@ -267,7 +268,7 @@ myModel.DiffTracker.Reset()
 fmt.Println(myModel.DiffTracker.Modified("StringVal")) // false
 ```
 
-## Get all modified fields
+### Get all modified fields
 ```go
 myModel.StringVal = "foo"
 // Store the current state for comparison
@@ -283,7 +284,7 @@ fmt.Println(isNew, modifiedFields) // false, []
 ```
 
 
-# Cascade Save/Delete
+## Cascade Save/Delete
 Bongo supports cascading portions of documents to related documents and the subsequent cleanup upon deletion. For example, if you have a `Team` collection, and each team has an array of `Players`, you can cascade a player's first name and last name to his or her `team.Players` array on save, and remove that element in the array if you delete the player.
 
 To use this feature, your struct needs to have an exported method called `GetCascade`, which returns an array of `*bongo.CascadeConfig`. Additionally, if you want to make use of the `OldQuery` property to remove references from previously related documents, you should probably alsotimplement the `DiffTracker` on your model struct (see above). 
