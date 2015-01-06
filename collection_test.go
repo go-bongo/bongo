@@ -40,10 +40,6 @@ func (s *TestSuite) TestSaveAndFindWithHooks(c *C) {
 
 func (s *TestSuite) TestSaveAndFindWithChild(c *C) {
 
-	connection := Connect(config)
-
-	defer connection.Session.Close()
-
 	// This needs to always be a pointer, otherwise the encryption component won't like it.
 	message := new(FooBar)
 	message.Msg = "Foo"
@@ -63,14 +59,9 @@ func (s *TestSuite) TestSaveAndFindWithChild(c *C) {
 	c.Assert(newMessage.Child.BazBing, Equals, "bar")
 	c.Assert(newMessage.Child.Foo, Equals, "foo")
 
-	connection.Session.DB(config.Database).DropDatabase()
 }
 
 func (s *TestSuite) TestValidationFailure(c *C) {
-
-	connection := Connect(config)
-
-	defer connection.Session.Close()
 
 	message := new(FooBar)
 	message.Msg = "Foo"
@@ -81,28 +72,18 @@ func (s *TestSuite) TestValidationFailure(c *C) {
 	c.Assert(result.Err.Error(), Equals, "Validation failed")
 	c.Assert(result.ValidationErrors[0], Equals, "count cannot be 3")
 
-	connection.Session.DB(config.Database).DropDatabase()
 }
 
 func (s *TestSuite) TestFindNonExistent(c *C) {
-
-	connection := Connect(config)
-
-	defer connection.Session.Close()
 
 	newMessage := new(FooBar)
 
 	err := connection.FindById(bson.NewObjectId(), newMessage)
 
 	c.Assert(err.Error(), Equals, "not found")
-	connection.Session.DB(config.Database).DropDatabase()
 }
 
 func (s *TestSuite) TestDelete(c *C) {
-
-	connection := Connect(config)
-
-	defer connection.Session.Close()
 
 	// This needs to always be a pointer, otherwise the encryption component won't like it.
 	message := new(FooBar)
@@ -120,15 +101,10 @@ func (s *TestSuite) TestDelete(c *C) {
 	c.Assert(err.Error(), Equals, "not found")
 	// Make sure the ids are the same
 	//
-	connection.Session.DB(config.Database).DropDatabase()
 
 }
 
 func (s *TestSuite) TestFindOne(c *C) {
-
-	connection := Connect(config)
-
-	defer connection.Session.Close()
 
 	// This needs to always be a pointer, otherwise the encryption component won't like it.
 	message := new(FooBar)
@@ -152,15 +128,9 @@ func (s *TestSuite) TestFindOne(c *C) {
 	c.Assert(result.Msg, Equals, "Foo")
 	c.Assert(result.Count, Equals, 7)
 
-	connection.Session.DB(config.Database).DropDatabase()
-
 }
 
 func (s *TestSuite) TestFind(c *C) {
-
-	connection := Connect(config)
-
-	defer connection.Session.Close()
 
 	// This needs to always be a pointer, otherwise the encryption component won't like it.
 	message := new(FooBar)
@@ -197,7 +167,6 @@ func (s *TestSuite) TestFind(c *C) {
 
 	c.Assert(count, Equals, 2)
 
-	connection.Session.DB(config.Database).DropDatabase()
 }
 
 func (s *TestSuite) TestFindWithPagination(c *C) {

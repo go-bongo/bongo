@@ -19,8 +19,6 @@ func (s *TestSuite) TestValidateInclusionIn(c *C) {
 
 func (s *TestSuite) TestValidateMongoIdRef(c *C) {
 	// Make the doc
-	connection := Connect(config)
-	defer connection.Session.Close()
 
 	message := new(FooBar)
 	message.Msg = "Foo"

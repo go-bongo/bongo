@@ -3,13 +3,14 @@ package bongo
 import (
 	// "fmt"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/oleiade/reflections"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	"log"
 	"reflect"
 	"strings"
-	// "fmt"
 	// "math"
 	// "strings"
 )
@@ -51,18 +52,32 @@ type Connection struct {
 }
 
 // Create a new connection and run Connect()
-func Connect(config *Config) *Connection {
+func Connect(config *Config) (*Connection, error) {
 	conn := &Connection{
 		Config: config,
 	}
 
-	conn.Connect()
+	err := conn.Connect()
 
-	return conn
+	return conn, err
 }
 
 // Connect to the database using the provided config
-func (m *Connection) Connect() {
+func (m *Connection) Connect() (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			// panic(r)
+			// return
+			if e, ok := r.(error); ok {
+				err = e
+			} else if e, ok := r.(string); ok {
+				err = errors.New(e)
+			} else {
+				err = errors.New(fmt.Sprint(r))
+			}
+
+		}
+	}()
 	session, err := mgo.Dial(m.Config.ConnectionString)
 
 	if err != nil {
@@ -70,6 +85,8 @@ func (m *Connection) Connect() {
 	}
 
 	m.Session = session
+
+	return nil
 }
 
 func (m *Connection) GetEncryptionKey(collection string) []byte {

@@ -72,10 +72,10 @@ var config = &Config{
 	EncryptionKey:    "asdf1234asdf1234",
 }
 
-var connection = Connect(config)
+var connection, _ = Connect(config)
 
 func (s *TestSuite) TearDownTest(c *C) {
-	// connection.Session.DB(config.Database).DropDatabase()
+	connection.Session.DB(config.Database).DropDatabase()
 }
 
 func (s *TestSuite) TearDownSuite(c *C) {
