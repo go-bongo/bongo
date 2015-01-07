@@ -18,8 +18,8 @@ import (
 type Config struct {
 	ConnectionString           string
 	Database                   string
-	EncryptionKey              string
-	EncryptionKeyPerCollection map[string]string
+	EncryptionKey              []byte
+	EncryptionKeyPerCollection map[string][]byte
 	DisableEncryption          bool
 }
 
@@ -94,9 +94,9 @@ func (m *Connection) GetEncryptionKey(collection string) []byte {
 	key, has := m.Config.EncryptionKeyPerCollection[collection]
 
 	if has {
-		return []byte(key)
+		return key
 	} else {
-		return []byte(m.Config.EncryptionKey)
+		return m.Config.EncryptionKey
 	}
 
 }

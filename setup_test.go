@@ -69,7 +69,7 @@ func (f *FooBar) AfterFind() {
 var config = &Config{
 	ConnectionString: "localhost",
 	Database:         "gotest",
-	EncryptionKey:    "asdf1234asdf1234",
+	EncryptionKey:    key,
 }
 
 var connection, _ = Connect(config)

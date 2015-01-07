@@ -21,7 +21,7 @@ Create a new `bongo.Config` instance:
 config := &bongo.Config{
 	ConnectionString: "localhost",
 	Database:         "bongotest",
-	EncryptionKey:    "MyEncryptionKey",
+	EncryptionKey:    []byte("MyEncryptionKey"),
 }
 ```
 
