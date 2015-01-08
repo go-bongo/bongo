@@ -29,8 +29,6 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 	defer func() {
 
 		if r := recover(); r != nil {
-			// panic(r)
-			// return
 			if e, ok := r.(error); ok {
 				result = NewSaveResult(false, e)
 			} else if e, ok := r.(string); ok {
@@ -149,7 +147,6 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 			}
 		}
 	}
-
 	return NewSaveResult(true, nil)
 }
 

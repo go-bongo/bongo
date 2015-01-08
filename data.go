@@ -3,6 +3,8 @@ package bongo
 import (
 	"encoding/json"
 	"github.com/oleiade/reflections"
+	"labix.org/v2/mgo/bson"
+	// "log"
 	"reflect"
 	"strings"
 )
@@ -22,14 +24,19 @@ func (c *Collection) PrepDocumentForSave(doc interface{}) map[string]interface{}
 	key := c.GetEncryptionKey()
 
 	var bsonName string
+	var bsons []string
 	for fieldName, bsonTag := range fields {
-		bsonName = strings.Split(bsonTag, ",")[0]
+		bsons = strings.Split(bsonTag, ",")
+		bsonName = bsons[0]
 
 		if bsonName == "-" {
 			continue
 		}
 		if len(bsonName) == 0 {
-			bsonName = strings.ToLower(fieldName)
+			left := string(fieldName[0])
+			rest := string(fieldName[1:])
+
+			bsonName = strings.Join([]string{strings.ToLower(left), rest}, "")
 		}
 
 		tag, _ := reflections.GetFieldTag(doc, fieldName, "bongo")
@@ -63,13 +70,18 @@ func (c *Collection) PrepDocumentForSave(doc interface{}) map[string]interface{}
 				if t.Kind() == reflect.Struct || !rval.IsNil() {
 					returnMap[bsonName] = c.PrepDocumentForSave(val)
 				}
+			} else if t.String() == "bson.ObjectId" {
+				// We won't catch "omitempty"
+				if idVal, ok := val.(bson.ObjectId); ok {
+					if idVal.Valid() {
+						returnMap[bsonName] = idVal
+					}
+				}
 			} else {
 				returnMap[bsonName] = val
 			}
 		}
 	}
-
-	// log.Println(returnMap)
 
 	return returnMap
 }
