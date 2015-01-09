@@ -73,6 +73,22 @@ func (c *DiffTracker) Compare() (bool, []string, error) {
 	}
 }
 
+func getFields(t reflect.Type) []string {
+	fields := []string{}
+
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		fields = append(fields, field.Name)
+	}
+
+	return fields
+
+}
+
 func getChangedFields(struct1 interface{}, struct2 interface{}) ([]string, error) {
 
 	diffs := make([]string, 0)
@@ -118,10 +134,20 @@ func getChangedFields(struct1 interface{}, struct2 interface{}) ([]string, error
 		}
 
 		if childType.Kind() == reflect.Struct {
-			childDiffs, err := getChangedFields(field1.Interface(), field2.Interface())
+			var childDiffs []string
+			var err error
+			// Make sure they aren't zero-value
+			if field1.IsNil() && field2.IsNil() {
+				return diffs, nil
+			} else if field2.IsNil() || field1.IsNil() {
+				childDiffs = getFields(childType)
 
-			if err != nil {
-				return diffs, err
+			} else {
+				childDiffs, err = getChangedFields(field1.Interface(), field2.Interface())
+
+				if err != nil {
+					return diffs, err
+				}
 			}
 
 			if len(childDiffs) > 0 {

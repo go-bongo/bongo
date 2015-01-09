@@ -18,14 +18,6 @@ type NullWriter int
 
 func (NullWriter) Write([]byte) (int, error) { return 0, nil }
 
-func (s *TestSuite) SetUpTest(c *C) {
-
-	if !testing.Verbose() {
-		log.SetOutput(new(NullWriter))
-	}
-
-}
-
 var key = []byte("asdf1234asdf1234")
 
 type Nested struct {
@@ -74,10 +66,13 @@ var config = &Config{
 
 var connection, _ = Connect(config)
 
-func (s *TestSuite) TearDownTest(c *C) {
+func (s *TestSuite) SetUpTest(c *C) {
 	connection.Session.DB(config.Database).DropDatabase()
-}
+	if !testing.Verbose() {
+		log.SetOutput(new(NullWriter))
+	}
 
+}
 func (s *TestSuite) TearDownSuite(c *C) {
 	connection.Session.Close()
 }

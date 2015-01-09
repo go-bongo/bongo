@@ -1,14 +1,16 @@
 package bongo
 
 import (
+	// "fmt"
 	. "gopkg.in/check.v1"
 	"labix.org/v2/mgo/bson"
 	// "log"
+	"reflect"
 )
 
 type Parent struct {
 	Id          bson.ObjectId `bson:"_id"`
-	Name        string        `bongo:"encrypted"`
+	Bar         string        `bongo:"encrypted"`
 	Number      int
 	Children    []*ChildRef  `bongo:"cascadedFrom=children"`
 	Child       *ChildRef    `bongo:"cascadedFrom=children"`
@@ -18,8 +20,8 @@ type Parent struct {
 func (c *Child) GetCascade() []*CascadeConfig {
 
 	cascadeSingle := &CascadeConfig{
-		Collection:  connection.Collection("parents").Collection(),
-		Properties:  []string{"name"},
+		Collection:  connection.Collection("parents"),
+		Properties:  []string{"name", "subChild.foo", "subChild._id"},
 		ThroughProp: "child",
 		RelType:     REL_ONE,
 		Query: bson.M{
@@ -28,8 +30,8 @@ func (c *Child) GetCascade() []*CascadeConfig {
 	}
 
 	cascadeMulti := &CascadeConfig{
-		Collection:  connection.Collection("parents").Collection(),
-		Properties:  []string{"name"},
+		Collection:  connection.Collection("parents"),
+		Properties:  []string{"name", "subChild.foo", "subChild._id"},
 		ThroughProp: "children",
 		RelType:     REL_MANY,
 		Query: bson.M{
@@ -37,20 +39,41 @@ func (c *Child) GetCascade() []*CascadeConfig {
 		},
 	}
 
-	if c.DiffTracker.Modified("ParentId") {
+	val := reflect.ValueOf(c).Elem()
+	diff := val.FieldByName("DiffTracker")
 
-		origId, _ := c.DiffTracker.GetOriginalValue("ParentId")
-		if origId != nil {
-			oldQuery := bson.M{
-				"_id": origId,
+	if !diff.IsNil() {
+		if c.DiffTracker.Modified("ParentId") {
+
+			origId, _ := c.DiffTracker.GetOriginalValue("ParentId")
+			if origId != nil {
+				oldQuery := bson.M{
+					"_id": origId,
+				}
+				cascadeSingle.OldQuery = oldQuery
+				cascadeMulti.OldQuery = oldQuery
 			}
-			cascadeSingle.OldQuery = oldQuery
-			cascadeMulti.OldQuery = oldQuery
-		}
 
+		}
 	}
 
 	return []*CascadeConfig{cascadeSingle, cascadeMulti}
+}
+
+func (c *SubChild) GetCascade() []*CascadeConfig {
+	cascadeSingle := &CascadeConfig{
+		Collection:  connection.Collection("children"),
+		Properties:  []string{"foo"},
+		ThroughProp: "subChild",
+		RelType:     REL_ONE,
+		Query: bson.M{
+			"_id": c.ChildId,
+		},
+		Nest:     true,
+		Instance: &Child{},
+	}
+
+	return []*CascadeConfig{cascadeSingle}
 }
 
 type Child struct {
@@ -59,11 +82,24 @@ type Child struct {
 	Name     string `bongo:"encrypted"`
 	// System will automatically instantate the tracker
 	DiffTracker *DiffTracker `bson:"-" json:"-"`
+	SubChild    *SubChildRef
+}
+
+type SubChild struct {
+	Id      bson.ObjectId `bson:"_id,omitempty"`
+	Foo     string
+	ChildId bson.ObjectId `bson:",omitempty"`
+}
+
+type SubChildRef struct {
+	Id  bson.ObjectId `bson:"_id,omitempty"`
+	Foo string
 }
 
 type ChildRef struct {
-	Id   bson.ObjectId `bson:"_id,omitempty"`
-	Name string        `bongo:"encrypted"`
+	Id       bson.ObjectId `bson:"_id,omitempty"`
+	Name     string        `bongo:"encrypted"`
+	SubChild *SubChildRef
 }
 
 func (s *TestSuite) TestCascade(c *C) {
@@ -76,16 +112,16 @@ func (s *TestSuite) TestCascade(c *C) {
 	}
 
 	childCollection := connection.Collection("children")
-
+	subchildCollection := connection.Collection("subchildren")
 	parent := &Parent{
-		Name:   "Testy McGee",
+		Bar:    "Testy McGee",
 		Number: 5,
 	}
 
 	parent.DiffTracker = NewDiffTracker(parent)
 
 	parent2 := &Parent{
-		Name:   "Other Parent",
+		Bar:    "Other Parent",
 		Number: 10,
 	}
 	parent2.DiffTracker = NewDiffTracker(parent2)
@@ -108,6 +144,7 @@ func (s *TestSuite) TestCascade(c *C) {
 
 	newParent := &Parent{}
 	collection.FindById(parent.Id, newParent)
+
 	c.Assert(newParent.Child.Name, Equals, "Foo McGoo")
 	c.Assert(newParent.Child.Id.Hex(), Equals, child.Id.Hex())
 	c.Assert(newParent.Children[0].Name, Equals, "Foo McGoo")
@@ -133,11 +170,26 @@ func (s *TestSuite) TestCascade(c *C) {
 	c.Assert(newParent2.Children[0].Name, Equals, "Foo McGoo")
 	c.Assert(newParent2.Children[0].Id.Hex(), Equals, child.Id.Hex())
 
+	// Make a new sub child, save it, and it should cascade to the child AND the parent
+	subChild := &SubChild{
+		Foo:     "MySubChild",
+		ChildId: child.Id,
+	}
+
+	res = subchildCollection.Save(subChild)
+	c.Assert(res.Success, Equals, true)
+
+	// Fetch the parent
 	newParent3 := &Parent{}
+	collection.FindById(parent2.Id, newParent3)
+	c.Assert(newParent3.Child.SubChild.Foo, Equals, "MySubChild")
+	c.Assert(newParent3.Child.SubChild.Id.Hex(), Equals, subChild.Id.Hex())
+
+	newParent4 := &Parent{}
 	err := childCollection.Delete(child)
 	c.Assert(err, Equals, nil)
-	collection.FindById(parent2.Id, newParent3)
-	c.Assert(newParent3.Child, IsNil)
-	c.Assert(len(newParent3.Children), Equals, 0)
+	collection.FindById(parent2.Id, newParent4)
+	c.Assert(newParent4.Child, IsNil)
+	c.Assert(len(newParent4.Children), Equals, 0)
 
 }

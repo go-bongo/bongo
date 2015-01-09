@@ -261,7 +261,6 @@ func (d *Decoder) decode(name string, data interface{}, val reflect.Value) error
 	if d.config.Metadata != nil && name != "" {
 		d.config.Metadata.Keys = append(d.config.Metadata.Keys, name)
 	}
-
 	return err
 }
 
@@ -542,6 +541,8 @@ func (d *Decoder) decodePtr(name string, data interface{}, val reflect.Value) er
 func (d *Decoder) decodeSlice(name string, data interface{}, val reflect.Value) error {
 	tags := d.CurrentField.Tag.Get("bongo")
 	fieldIsEncrypted := false
+
+	previousCascadedFrom := d.CascadedFrom
 	if len(tags) > 0 {
 		config := getBongoTags(tags)
 		if len(config.cascadedFrom) > 0 {
@@ -593,7 +594,8 @@ func (d *Decoder) decodeSlice(name string, data interface{}, val reflect.Value) 
 	val.Set(valSlice)
 
 	d.inArrayWithCascadedFrom = false
-	d.CascadedFrom = ""
+
+	d.CascadedFrom = previousCascadedFrom
 
 	if fieldIsEncrypted {
 		d.InEncryptedProp = false
@@ -610,6 +612,7 @@ func (d *Decoder) decodeStruct(name string, data interface{}, val reflect.Value)
 	// Get the tags, check cascadedFrom
 	tags := d.CurrentField.Tag.Get("bongo")
 	fieldIsEncrypted := false
+	previousCascadedFrom := d.CascadedFrom
 	if len(tags) > 0 {
 		config := getBongoTags(tags)
 		if len(config.cascadedFrom) > 0 && !d.inArrayWithCascadedFrom {
@@ -620,6 +623,7 @@ func (d *Decoder) decodeStruct(name string, data interface{}, val reflect.Value)
 			d.InEncryptedProp = true
 		}
 	}
+
 	dataVal := reflect.Indirect(reflect.ValueOf(data))
 	dataValKind := dataVal.Kind()
 
@@ -630,7 +634,7 @@ func (d *Decoder) decodeStruct(name string, data interface{}, val reflect.Value)
 
 		// Reset cascadedFrom so we use the root-level collection name for encryption key detection
 		if !d.inArrayWithCascadedFrom {
-			d.CascadedFrom = ""
+			d.CascadedFrom = previousCascadedFrom
 		}
 
 		if fieldIsEncrypted {
@@ -779,7 +783,7 @@ func (d *Decoder) decodeStruct(name string, data interface{}, val reflect.Value)
 
 	// Reset cascadedFrom so we use the root-level collection name for encryption key detection
 	if !d.inArrayWithCascadedFrom {
-		d.CascadedFrom = ""
+		d.CascadedFrom = previousCascadedFrom
 	}
 
 	if fieldIsEncrypted {

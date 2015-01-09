@@ -2,12 +2,12 @@ package bongo
 
 import (
 	"errors"
-	// "github.com/maxwellhealth/dotaccess"
+	"github.com/maxwellhealth/dotaccess"
 	"github.com/oleiade/reflections"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	// "log"
-	// "strings"
+	"strings"
 )
 
 // Relation types (one-to-many or one-to-one)
@@ -19,7 +19,7 @@ const (
 // Configuration to tell Bongo how to cascade data to related documents on save or delete
 type CascadeConfig struct {
 	// The collection to cascade to
-	Collection *mgo.Collection
+	Collection *Collection
 
 	// The relation type (does the target doc have an array of these docs [REL_MANY] or just reference a single doc [REL_ONE])
 	RelType int
@@ -33,8 +33,14 @@ type CascadeConfig struct {
 	// The data that constructs the query may have changed - this is to remove self from previous relations
 	OldQuery bson.M
 
+	// Should it also cascade the related doc on save?
+	Nest bool
+
 	// Data to cascade. Can be in dot notation
 	Properties []string
+
+	// An instance of the related doc if it needs to be nested
+	Instance interface{}
 }
 
 // Cascades a document's properties to related documents, after it has been prepared
@@ -48,6 +54,16 @@ func CascadeSave(doc interface{}, preparedForSave map[string]interface{}) {
 
 		for _, conf := range toCascade {
 			cascadeSaveWithConfig(conf, preparedForSave)
+
+			if conf.Nest {
+				results := conf.Collection.Find(conf.Query)
+
+				for results.Next(conf.Instance) {
+					prepared := conf.Collection.PrepDocumentForSave(conf.Instance)
+					CascadeSave(conf.Instance, prepared)
+				}
+
+			}
 		}
 	}
 }
@@ -87,7 +103,7 @@ func cascadeDeleteWithConfig(conf *CascadeConfig, id bson.ObjectId) (*mgo.Change
 
 		update["$set"][conf.ThroughProp] = nil
 
-		return conf.Collection.UpdateAll(conf.Query, update)
+		return conf.Collection.Collection().UpdateAll(conf.Query, update)
 	case REL_MANY:
 		update := map[string]map[string]interface{}{
 			"$pull": map[string]interface{}{},
@@ -96,7 +112,7 @@ func cascadeDeleteWithConfig(conf *CascadeConfig, id bson.ObjectId) (*mgo.Change
 		update["$pull"][conf.ThroughProp] = bson.M{
 			"_id": id,
 		}
-		return conf.Collection.UpdateAll(conf.Query, update)
+		return conf.Collection.Collection().UpdateAll(conf.Query, update)
 	}
 
 	return &mgo.ChangeInfo{}, errors.New("Invalid relation type")
@@ -113,12 +129,40 @@ func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]inter
 	data["_id"] = id
 
 	for _, prop := range conf.Properties {
-		data[prop] = preparedForSave[prop]
+		split := strings.Split(prop, ".")
+
+		if len(split) == 1 {
+			data[prop] = preparedForSave[prop]
+		} else {
+			actualProp := split[len(split)-1]
+			split := append([]string{}, split[:len(split)-1]...)
+			curData := data
+
+			for _, s := range split {
+				if _, ok := curData[s]; ok {
+					if mapped, ok := curData[s].(map[string]interface{}); ok {
+						curData = mapped
+					} else {
+						panic("Cannot access non-map property via dot notationa")
+					}
+
+				} else {
+					curData[s] = make(map[string]interface{})
+					if mapped, ok := curData[s].(map[string]interface{}); ok {
+						curData = mapped
+					} else {
+						panic("Cannot access non-map property via dot notationb")
+					}
+				}
+			}
+
+			curData[actualProp], _ = dotaccess.Get(preparedForSave, prop)
+		}
+
 	}
 
 	switch conf.RelType {
 	case REL_ONE:
-
 		if len(conf.OldQuery) > 0 {
 
 			update1 := map[string]map[string]interface{}{
@@ -126,7 +170,7 @@ func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]inter
 			}
 
 			update1["$set"][conf.ThroughProp] = nil
-			conf.Collection.UpdateAll(conf.OldQuery, update1)
+			conf.Collection.Collection().UpdateAll(conf.OldQuery, update1)
 		}
 
 		update := map[string]map[string]interface{}{
@@ -136,7 +180,7 @@ func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]inter
 		update["$set"][conf.ThroughProp] = data
 
 		// Just update
-		return conf.Collection.UpdateAll(conf.Query, update)
+		return conf.Collection.Collection().UpdateAll(conf.Query, update)
 	case REL_MANY:
 		update1 := map[string]map[string]interface{}{
 			"$pull": map[string]interface{}{},
@@ -147,18 +191,18 @@ func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]inter
 		}
 
 		if len(conf.OldQuery) > 0 {
-			conf.Collection.UpdateAll(conf.OldQuery, update1)
+			conf.Collection.Collection().UpdateAll(conf.OldQuery, update1)
 		}
 
 		// Remove self from current relations, so we can replace it
-		conf.Collection.UpdateAll(conf.Query, update1)
+		conf.Collection.Collection().UpdateAll(conf.Query, update1)
 
 		update2 := map[string]map[string]interface{}{
 			"$push": map[string]interface{}{},
 		}
-		update2["$push"][conf.ThroughProp] = data
 
-		return conf.Collection.UpdateAll(conf.Query, update2)
+		update2["$push"][conf.ThroughProp] = data
+		return conf.Collection.Collection().UpdateAll(conf.Query, update2)
 
 	}
 

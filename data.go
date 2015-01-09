@@ -181,6 +181,7 @@ func (c *Collection) InitializeDocumentFromDB(encrypted map[string]interface{}, 
 			if bongoConfig.encrypted {
 				// Decrypt it
 				key := c.Connection.GetEncryptionKey(colName)
+				// log.Println("Decoding", data, "from collection", colName, "in struct field", currentField)
 				// key := c.Connection.GetEncryptionKey("asdf1234asdf1234")
 
 				if str, ok := data.(string); ok {
