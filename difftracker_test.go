@@ -3,13 +3,23 @@ package bongo
 import (
 	. "gopkg.in/check.v1"
 	"labix.org/v2/mgo/bson"
+	"reflect"
 )
 
 type FooChangeTest struct {
 	Id          bson.ObjectId `bson:"_id,omitempty"`
 	StringVal   string
 	IntVal      int
-	DiffTracker *DiffTracker
+	diffTracker *DiffTracker
+}
+
+func (f *FooChangeTest) GetDiffTracker() *DiffTracker {
+	v := reflect.ValueOf(f.diffTracker)
+	if !v.IsValid() || v.IsNil() {
+		f.diffTracker = NewDiffTracker(f)
+	}
+
+	return f.diffTracker
 }
 
 type FooBarChangeTest struct {
@@ -63,10 +73,9 @@ func (s *TestSuite) TestModified(c *C) {
 		IntVal:    1,
 	}
 
-	foo1.DiffTracker = NewDiffTracker(foo1)
-	foo1.DiffTracker.Reset()
+	foo1.GetDiffTracker().Reset()
 
 	foo1.StringVal = "bar"
 
-	c.Assert(foo1.DiffTracker.Modified("StringVal"), Equals, true)
+	c.Assert(foo1.diffTracker.Modified("StringVal"), Equals, true)
 }

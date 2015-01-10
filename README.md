@@ -242,16 +242,26 @@ if err != nil {
 ```
 
 ## Change Tracking
-If your model struct has a property `DiffTracker *bongo.DiffTracker`, it will automatically track changes to your model so you can compare the current values with the original. You need to set the diff tracker on your model using `bongo.NewDiffTracker(model)`, like so:
+If your model struct implements the `Trackable` interface, it will automatically track changes to your model so you can compare the current values with the original. For example:
+
 ```go
 type MyModel struct {
 	Id bson.ObjectId `bson:"_id"`
 	StringVal string
-	DiffTracker *bongo.DiffTracker
+	diffTracker *bongo.DiffTracker
+}
+
+// Easy way to lazy load a diff tracker
+func (m *MyModel) GetDiffTracker() *DiffTracker {
+	v := reflect.ValueOf(m.diffTracker)
+	if !v.IsValid() || v.IsNil() {
+		m.diffTracker = NewDiffTracker(m)
+	}
+
+	return m.diffTracker
 }
 
 myModel := &MyModel{}
-myModel.DiffTracker = bongo.NewDiffTracker(myModel)
 ```
 
 Use as follows:
@@ -259,26 +269,27 @@ Use as follows:
 ### Check if a field has been modified
 ```go
 // Store the current state for comparison
-myModel.DiffTracker.Reset()
+myModel.GetDiffTracker().Reset()
 
 // Change a property...
 myModel.StringVal = "foo"
 
-fmt.Println(myModel.DiffTracker.Modified("StringVal")) // true
-myModel.DiffTracker.Reset()
-fmt.Println(myModel.DiffTracker.Modified("StringVal")) // false
+// We know it's been instantiated so no need to use GetDiffTracker()
+fmt.Println(myModel.diffTracker.Modified("StringVal")) // true
+myModel.diffTracker.Reset()
+fmt.Println(myModel.diffTracker.Modified("StringVal")) // false
 ```
 
 ### Get all modified fields
 ```go
 myModel.StringVal = "foo"
 // Store the current state for comparison
-myModel.DiffTracker.Reset()
+myModel.GetDiffTracker().Reset()
 
 isNew, modifiedFields := myModel.GetModified()
 
 fmt.Println(isNew, modifiedFields) // false, ["StringVal"]
-myModel.DiffTracker.Reset()
+myModel.diffTracker.Reset()
 
 isNew, modifiedFields = myModel.GetModified()
 fmt.Println(isNew, modifiedFields) // false, []

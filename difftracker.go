@@ -15,6 +15,10 @@ type DiffTracker struct {
 	current  interface{}
 }
 
+type Trackable interface {
+	GetDiffTracker() *DiffTracker
+}
+
 func NewDiffTracker(doc interface{}) *DiffTracker {
 	c := &DiffTracker{
 		current:  doc,
@@ -129,7 +133,7 @@ func getChangedFields(struct1 interface{}, struct2 interface{}) ([]string, error
 		}
 
 		// Skip if not exported
-		if len(field.PkgPath) > 0 || field.Name == "DiffTracker" {
+		if len(field.PkgPath) > 0 {
 			continue
 		}
 

@@ -12,9 +12,18 @@ type Parent struct {
 	Id          bson.ObjectId `bson:"_id"`
 	Bar         string        `bongo:"encrypted"`
 	Number      int
-	Children    []*ChildRef  `bongo:"cascadedFrom=children"`
-	Child       *ChildRef    `bongo:"cascadedFrom=children"`
-	DiffTracker *DiffTracker `bson:"-" json:"-"`
+	Children    []*ChildRef `bongo:"cascadedFrom=children"`
+	Child       *ChildRef   `bongo:"cascadedFrom=children"`
+	diffTracker *DiffTracker
+}
+
+func (f *Parent) GetDiffTracker() *DiffTracker {
+	v := reflect.ValueOf(f.diffTracker)
+	if !v.IsValid() || v.IsNil() {
+		f.diffTracker = NewDiffTracker(f)
+	}
+
+	return f.diffTracker
 }
 
 func (c *Child) GetCascade() []*CascadeConfig {
@@ -39,22 +48,17 @@ func (c *Child) GetCascade() []*CascadeConfig {
 		},
 	}
 
-	val := reflect.ValueOf(c).Elem()
-	diff := val.FieldByName("DiffTracker")
+	if c.GetDiffTracker().Modified("ParentId") {
 
-	if !diff.IsNil() {
-		if c.DiffTracker.Modified("ParentId") {
-
-			origId, _ := c.DiffTracker.GetOriginalValue("ParentId")
-			if origId != nil {
-				oldQuery := bson.M{
-					"_id": origId,
-				}
-				cascadeSingle.OldQuery = oldQuery
-				cascadeMulti.OldQuery = oldQuery
+		origId, _ := c.diffTracker.GetOriginalValue("ParentId")
+		if origId != nil {
+			oldQuery := bson.M{
+				"_id": origId,
 			}
-
+			cascadeSingle.OldQuery = oldQuery
+			cascadeMulti.OldQuery = oldQuery
 		}
+
 	}
 
 	return []*CascadeConfig{cascadeSingle, cascadeMulti}
@@ -77,12 +81,20 @@ func (c *SubChild) GetCascade() []*CascadeConfig {
 }
 
 type Child struct {
-	Id       bson.ObjectId `bson:"_id"`
-	ParentId bson.ObjectId
-	Name     string `bongo:"encrypted"`
-	// System will automatically instantate the tracker
-	DiffTracker *DiffTracker `bson:"-" json:"-"`
+	Id          bson.ObjectId `bson:"_id"`
+	ParentId    bson.ObjectId
+	Name        string `bongo:"encrypted"`
 	SubChild    *SubChildRef
+	diffTracker *DiffTracker
+}
+
+func (f *Child) GetDiffTracker() *DiffTracker {
+	v := reflect.ValueOf(f.diffTracker)
+	if !v.IsValid() || v.IsNil() {
+		f.diffTracker = NewDiffTracker(f)
+	}
+
+	return f.diffTracker
 }
 
 type SubChild struct {
@@ -118,13 +130,10 @@ func (s *TestSuite) TestCascade(c *C) {
 		Number: 5,
 	}
 
-	parent.DiffTracker = NewDiffTracker(parent)
-
 	parent2 := &Parent{
 		Bar:    "Other Parent",
 		Number: 10,
 	}
-	parent2.DiffTracker = NewDiffTracker(parent2)
 
 	res := collection.Save(parent)
 
@@ -136,8 +145,6 @@ func (s *TestSuite) TestCascade(c *C) {
 		ParentId: parent.Id,
 		Name:     "Foo McGoo",
 	}
-
-	child.DiffTracker = NewDiffTracker(child)
 
 	res = childCollection.Save(child)
 	c.Assert(res.Success, Equals, true)
@@ -152,12 +159,12 @@ func (s *TestSuite) TestCascade(c *C) {
 
 	// Now change the child parent Id...
 	child.ParentId = parent2.Id
-	c.Assert(child.DiffTracker.Modified("ParentId"), Equals, true)
+	c.Assert(child.GetDiffTracker().Modified("ParentId"), Equals, true)
 
 	res = childCollection.Save(child)
 	c.Assert(res.Success, Equals, true)
 	// Now make sure it says the parent id DIDNT change, because we just saved it
-	c.Assert(child.DiffTracker.Modified("ParentId"), Equals, false)
+	c.Assert(child.GetDiffTracker().Modified("ParentId"), Equals, false)
 
 	newParent1 := &Parent{}
 	collection.FindById(parent.Id, newParent1)

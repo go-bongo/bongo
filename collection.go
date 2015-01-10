@@ -6,8 +6,8 @@ import (
 	"github.com/oleiade/reflections"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
-	"log"
-	"reflect"
+	// "log"
+	// "reflect"
 	// "math"
 	// "strings"
 )
@@ -67,16 +67,15 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 	}
 
 	// Validate?
-	if _, ok := mod.(interface {
+	if validator, ok := mod.(interface {
 		Validate() []string
 	}); ok {
-		results := reflect.ValueOf(mod).MethodByName("Validate").Call([]reflect.Value{})
-		if errs, ok := results[0].Interface().([]string); ok {
-			if len(errs) > 0 {
-				err := NewSaveResult(false, errors.New("Validation failed"))
-				err.ValidationErrors = errs
-				return err
-			}
+		errs := validator.Validate()
+
+		if len(errs) > 0 {
+			err := NewSaveResult(false, errors.New("Validation failed"))
+			err.ValidationErrors = errs
+			return err
 		}
 	}
 
@@ -130,24 +129,12 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 		hook.AfterSave()
 	}
 
-	// 7) If the model has a DiffTracker property that is a DiffTracker, instantiate it and save the original model
-	t := reflect.ValueOf(mod)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
+	// 7) If the model implementsTrackable, reset the diff tracker
+	if trackable, ok := mod.(Trackable); ok {
+		tracker := trackable.GetDiffTracker()
+		tracker.Reset()
 	}
 
-	field := t.FieldByName("DiffTracker")
-	if field.IsValid() {
-		if field.IsNil() {
-			log.Println("DiffTracker is not instantiated, cannot use")
-		} else if field.Type().String() != "*bongo.DiffTracker" {
-			log.Println("DiffTracker is not pointer to instance of bongo.DiffTracker, cannot use")
-		} else {
-			if diffed, ok := field.Interface().(*DiffTracker); ok {
-				diffed.Reset()
-			}
-		}
-	}
 	return NewSaveResult(true, nil)
 }
 
