@@ -49,7 +49,6 @@ func (c *Child) GetCascade() []*CascadeConfig {
 	}
 
 	if c.GetDiffTracker().Modified("ParentId") {
-
 		origId, _ := c.diffTracker.GetOriginalValue("ParentId")
 		if origId != nil {
 			oldQuery := bson.M{
@@ -148,7 +147,7 @@ func (s *TestSuite) TestCascade(c *C) {
 
 	res = childCollection.Save(child)
 	c.Assert(res.Success, Equals, true)
-
+	child.diffTracker.Reset()
 	newParent := &Parent{}
 	collection.FindById(parent.Id, newParent)
 
@@ -162,8 +161,9 @@ func (s *TestSuite) TestCascade(c *C) {
 	c.Assert(child.GetDiffTracker().Modified("ParentId"), Equals, true)
 
 	res = childCollection.Save(child)
+	child.diffTracker.Reset()
 	c.Assert(res.Success, Equals, true)
-	// Now make sure it says the parent id DIDNT change, because we just saved it
+	// Now make sure it says the parent id DIDNT change, because we just reset the tracker
 	c.Assert(child.GetDiffTracker().Modified("ParentId"), Equals, false)
 
 	newParent1 := &Parent{}

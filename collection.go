@@ -129,11 +129,11 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 		hook.AfterSave()
 	}
 
-	// 7) If the model implementsTrackable, reset the diff tracker
-	if trackable, ok := mod.(Trackable); ok {
-		tracker := trackable.GetDiffTracker()
-		tracker.Reset()
-	}
+	// Leave this to the user.
+	// if trackable, ok := mod.(Trackable); ok {
+	// 	tracker := trackable.GetDiffTracker()
+	// 	tracker.Reset()
+	// }
 
 	return NewSaveResult(true, nil)
 }
