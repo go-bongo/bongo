@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/maxwellhealth/dotaccess"
 	// "labix.org/v2/mgo/bson"
-	// "log"
 	"reflect"
 	"strings"
 )
@@ -34,7 +33,7 @@ func (c *DiffTracker) Reset() {
 }
 
 func (c *DiffTracker) Modified(field string) bool {
-	isNew, diffs, _ := c.Compare()
+	isNew, diffs, _ := c.Compare(false)
 
 	if isNew {
 		return true
@@ -43,8 +42,8 @@ func (c *DiffTracker) Modified(field string) bool {
 	}
 }
 
-func (c *DiffTracker) GetModified() (bool, []string) {
-	isNew, diffs, _ := c.Compare()
+func (c *DiffTracker) GetModified(useBson bool) (bool, []string) {
+	isNew, diffs, _ := c.Compare(useBson)
 
 	return isNew, diffs
 }
@@ -61,7 +60,7 @@ func (c *DiffTracker) Clear() {
 	c.original = nil
 }
 
-func (c *DiffTracker) Compare() (bool, []string, error) {
+func (c *DiffTracker) Compare(useBson bool) (bool, []string, error) {
 	defer func() {
 
 		if r := recover(); r != nil {
@@ -70,7 +69,7 @@ func (c *DiffTracker) Compare() (bool, []string, error) {
 		}
 	}()
 	if c.original != nil {
-		diffs, err := getChangedFields(c.original, c.current)
+		diffs, err := getChangedFields(c.original, c.current, useBson)
 		return false, diffs, err
 	} else {
 		return true, []string{}, nil
@@ -93,7 +92,11 @@ func getFields(t reflect.Type) []string {
 
 }
 
-func getChangedFields(struct1 interface{}, struct2 interface{}) ([]string, error) {
+func isNilOrInvalid(f reflect.Value) bool {
+	return (!f.IsValid())
+}
+
+func getChangedFields(struct1 interface{}, struct2 interface{}, useBson bool) ([]string, error) {
 
 	diffs := make([]string, 0)
 	val1 := reflect.ValueOf(struct1)
@@ -124,7 +127,13 @@ func getChangedFields(struct1 interface{}, struct2 interface{}) ([]string, error
 		field2 := val2.Field(i)
 
 		field := type1.Field(i)
-		fieldName := field.Name
+
+		var fieldName string
+		if useBson {
+			fieldName = GetBsonName(field)
+		} else {
+			fieldName = field.Name
+		}
 
 		childType := field1.Type()
 		// Recurse?
@@ -138,20 +147,29 @@ func getChangedFields(struct1 interface{}, struct2 interface{}) ([]string, error
 		}
 
 		if childType.Kind() == reflect.Struct {
+
 			var childDiffs []string
 			var err error
 			// Make sure they aren't zero-value
-			if field1.IsNil() && field2.IsNil() {
+			if isNilOrInvalid(field1) && isNilOrInvalid(field2) {
 				return diffs, nil
-			} else if field2.IsNil() || field1.IsNil() {
+			} else if isNilOrInvalid(field1) || isNilOrInvalid(field2) {
 				childDiffs = getFields(childType)
 
 			} else {
-				childDiffs, err = getChangedFields(field1.Interface(), field2.Interface())
+				// Special for time.Time and bson.ObjectId
+				if childType.String() == "time.Time" || childType.String() == "bson.ObjectId" {
+					if fmt.Sprint(field1.Interface()) != fmt.Sprint(field2.Interface()) {
+						diffs = append(diffs, fieldName)
+					}
+				} else {
+					childDiffs, err = getChangedFields(field1.Interface(), field2.Interface(), useBson)
 
-				if err != nil {
-					return diffs, err
+					if err != nil {
+						return diffs, err
+					}
 				}
+
 			}
 
 			if len(childDiffs) > 0 {

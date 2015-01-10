@@ -4,12 +4,14 @@ import (
 	. "gopkg.in/check.v1"
 	"labix.org/v2/mgo/bson"
 	"reflect"
+	"time"
 )
 
 type FooChangeTest struct {
 	Id          bson.ObjectId `bson:"_id,omitempty"`
 	StringVal   string
 	IntVal      int
+	Timestamp   time.Time
 	diffTracker *DiffTracker
 }
 
@@ -37,7 +39,7 @@ func (s *TestSuite) TestGetChangedFields(c *C) {
 		IntVal:    2,
 	}
 
-	diffs, err := getChangedFields(foo1, foo2)
+	diffs, err := getChangedFields(foo1, foo2, false)
 	c.Assert(err, Equals, nil)
 	c.Assert(len(diffs), Equals, 2)
 	c.Assert(diffs[0], Equals, "StringVal")
@@ -55,15 +57,17 @@ func (s *TestSuite) TestGetChangedFields(c *C) {
 		FooVal: &FooChangeTest{
 			StringVal: "foo",
 			IntVal:    10,
+			Timestamp: time.Now(),
 		},
 		BarVal: "BAR",
 	}
 
-	diffs, err = getChangedFields(foobar1, foobar2)
+	diffs, err = getChangedFields(foobar1, foobar2, false)
 	c.Assert(err, Equals, nil)
-	c.Assert(len(diffs), Equals, 2)
+	c.Assert(len(diffs), Equals, 3)
 	c.Assert(diffs[0], Equals, "FooVal.IntVal")
-	c.Assert(diffs[1], Equals, "BarVal")
+	c.Assert(diffs[1], Equals, "FooVal.Timestamp")
+	c.Assert(diffs[2], Equals, "BarVal")
 
 }
 

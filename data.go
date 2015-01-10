@@ -64,22 +64,25 @@ func (c *Collection) PrepDocumentForSave(doc interface{}) map[string]interface{}
 			t := reflect.TypeOf(val)
 			rval := reflect.ValueOf(val)
 			// May need to iterate over sub documents with their own bson/encryption settings. It won't be a separate encryption key since it's not cascaded (that will be skipped above if bongoTags.cascaded)
-			if shouldRecurse(t) {
+			if rval.IsValid() {
+				if shouldRecurse(t, rval) {
 
-				// Recurse only if not nil
-				if t.Kind() == reflect.Struct || !rval.IsNil() {
-					returnMap[bsonName] = c.PrepDocumentForSave(val)
-				}
-			} else if t.String() == "bson.ObjectId" {
-				// We won't catch "omitempty"
-				if idVal, ok := val.(bson.ObjectId); ok {
-					if idVal.Valid() {
-						returnMap[bsonName] = idVal
+					// Recurse only if not nil
+					if t.Kind() == reflect.Struct || !rval.IsNil() {
+						returnMap[bsonName] = c.PrepDocumentForSave(val)
 					}
+				} else if t.String() == "bson.ObjectId" {
+					// We won't catch "omitempty"
+					if idVal, ok := val.(bson.ObjectId); ok {
+						if idVal.Valid() {
+							returnMap[bsonName] = idVal
+						}
+					}
+				} else {
+					returnMap[bsonName] = val
 				}
-			} else {
-				returnMap[bsonName] = val
 			}
+
 		}
 	}
 
@@ -103,7 +106,7 @@ type setValue struct {
 	value     interface{}
 }
 
-func shouldRecurse(t reflect.Type) bool {
+func shouldRecurse(t reflect.Type, v reflect.Value) bool {
 	if (t.Kind() == reflect.Struct || t.Kind() == reflect.Ptr) && !strings.HasSuffix(t.String(), "bson.ObjectId") && !strings.HasSuffix(t.String(), "time.Time") {
 		return true
 	}
