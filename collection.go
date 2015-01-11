@@ -6,6 +6,7 @@ import (
 	"github.com/oleiade/reflections"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
+	"time"
 	// "log"
 	// "reflect"
 	// "math"
@@ -80,24 +81,30 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 
 	if isNew {
 		if hook, ok := mod.(interface {
-			BeforeCreate()
+			BeforeCreate(*Collection)
 		}); ok {
-			hook.BeforeCreate()
+			hook.BeforeCreate(c)
 		}
 	} else if hook, ok := mod.(interface {
-		BeforeUpdate()
+		BeforeUpdate(*Collection)
 	}); ok {
-		hook.BeforeUpdate()
+		hook.BeforeUpdate(c)
 	}
 
 	if hook, ok := mod.(interface {
-		BeforeSave()
+		BeforeSave(*Collection)
 	}); ok {
-		hook.BeforeSave()
+		hook.BeforeSave(c)
 	}
 
 	// 3) Convert the model into a map using the crypt library
 	modelMap := c.PrepDocumentForSave(mod)
+
+	// Add created/modified time
+	if isNew {
+		modelMap["_created"] = time.Now()
+	}
+	modelMap["_modified"] = time.Now()
 
 	// 4) Cascade?
 	CascadeSave(mod, modelMap)
@@ -112,20 +119,20 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 	// 6) Run afterSave hooks
 	if isNew {
 		if hook, ok := mod.(interface {
-			AfterCreate()
+			AfterCreate(*Collection)
 		}); ok {
-			hook.AfterCreate()
+			hook.AfterCreate(c)
 		}
 	} else if hook, ok := mod.(interface {
-		AfterUpdate()
+		AfterUpdate(*Collection)
 	}); ok {
-		hook.AfterUpdate()
+		hook.AfterUpdate(c)
 	}
 
 	if hook, ok := mod.(interface {
-		AfterSave()
+		AfterSave(*Collection)
 	}); ok {
-		hook.AfterSave()
+		hook.AfterSave(c)
 	}
 
 	// Leave this to the user.
@@ -150,9 +157,9 @@ func (c *Collection) FindById(id bson.ObjectId, mod interface{}) error {
 	c.InitializeDocumentFromDB(returnMap, mod)
 
 	if hook, ok := mod.(interface {
-		AfterFind()
+		AfterFind(*Collection)
 	}); ok {
-		hook.AfterFind()
+		hook.AfterFind(c)
 	}
 	return nil
 }
@@ -192,9 +199,9 @@ func (c *Collection) Delete(mod interface{}) error {
 	}
 	id := f.(bson.ObjectId)
 	if hook, ok := mod.(interface {
-		BeforeDelete()
+		BeforeDelete(*Collection)
 	}); ok {
-		hook.BeforeDelete()
+		hook.BeforeDelete(c)
 	}
 
 	err = c.Collection().Remove(bson.M{"_id": id})
@@ -205,9 +212,9 @@ func (c *Collection) Delete(mod interface{}) error {
 
 	CascadeDelete(mod)
 	if hook, ok := mod.(interface {
-		AfterDelete()
+		AfterDelete(*Collection)
 	}); ok {
-		hook.AfterDelete()
+		hook.AfterDelete(c)
 	}
 
 	return nil

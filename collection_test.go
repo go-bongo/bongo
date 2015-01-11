@@ -126,7 +126,8 @@ func (s *TestSuite) TestFindOne(c *C) {
 	c.Assert(err, Equals, nil)
 
 	c.Assert(result.Msg, Equals, "Foo")
-	c.Assert(result.Count, Equals, 7)
+	// After find adds 5
+	c.Assert(result.Count, Equals, 12)
 
 }
 

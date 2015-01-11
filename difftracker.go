@@ -93,6 +93,9 @@ func getFields(t reflect.Type) []string {
 }
 
 func isNilOrInvalid(f reflect.Value) bool {
+	if f.Kind() == reflect.Ptr && f.IsNil() {
+		return true
+	}
 	return (!f.IsValid())
 }
 
@@ -123,6 +126,7 @@ func getChangedFields(struct1 interface{}, struct2 interface{}, useBson bool) ([
 	}
 
 	for i := 0; i < type1.NumField(); i++ {
+
 		field1 := val1.Field(i)
 		field2 := val2.Field(i)
 

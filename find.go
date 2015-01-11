@@ -33,6 +33,12 @@ func (r *ResultSet) Next(mod interface{}) bool {
 
 	if gotResult {
 		r.Collection.InitializeDocumentFromDB(returnMap, mod)
+
+		if hook, ok := mod.(interface {
+			AfterFind(*Collection)
+		}); ok {
+			hook.AfterFind(r.Collection)
+		}
 		return true
 	}
 

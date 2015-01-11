@@ -42,19 +42,19 @@ func (f *FooBar) Validate() []string {
 }
 
 // Add some hooks
-func (f *FooBar) BeforeSave() {
+func (f *FooBar) BeforeSave(c *Collection) {
 	f.Count++
 }
 
-func (f *FooBar) BeforeCreate() {
+func (f *FooBar) BeforeCreate(c *Collection) {
 	f.Count++
 }
 
-func (f *FooBar) BeforeUpdate() {
+func (f *FooBar) BeforeUpdate(c *Collection) {
 	f.Count = f.Count + 2
 }
 
-func (f *FooBar) AfterFind() {
+func (f *FooBar) AfterFind(c *Collection) {
 	f.Count = f.Count + 5
 }
 
