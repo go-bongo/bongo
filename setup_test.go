@@ -32,7 +32,7 @@ type FooBar struct {
 	Child *Nested
 }
 
-func (f *FooBar) Validate() []string {
+func (f *FooBar) Validate(c *Collection) []string {
 	errs := []string{}
 	if f.Count == 3 {
 		errs = append(errs, "count cannot be 3")

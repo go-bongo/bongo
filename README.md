@@ -93,16 +93,16 @@ connection.Register(&Person{}, "people")
 
 #### Hooks
 
-You can add special methods to your struct that will automatically get called by bongo during certain actions. Currently available hooks are:
+You can add special methods to your struct that will automatically get called by bongo during certain actions. Hooks get passed the current `*bongo.Collection` so you can avoid having to couple them with your actual database layer. Currently available hooks are:
 
-* `func (s *ModelStruct) Validate() []string` (returns a slice of errors)
-* `func (s *ModelStruct) BeforeSave()`
-* `func (s *ModelStruct) BeforeCreate()`
-* `func (s *ModelStruct) BeforeUpdate()`
-* `func (s *ModelStruct) AfterSave()`
-* `func (s *ModelStruct) AfterCreate()`
-* `func (s *ModelStruct) AfterUpdate()`
-* `func (s *ModelStruct) AfterFind()`
+* `func (s *ModelStruct) Validate(*bongo.Collection) []string` (returns a slice of errors)
+* `func (s *ModelStruct) BeforeSave(*bongo.Collection)`
+* `func (s *ModelStruct) BeforeCreate(*bongo.Collection)`
+* `func (s *ModelStruct) BeforeUpdate(*bongo.Collection)`
+* `func (s *ModelStruct) AfterSave(*bongo.Collection)`
+* `func (s *ModelStruct) AfterCreate(*bongo.Collection)`
+* `func (s *ModelStruct) AfterUpdate(*bongo.Collection)`
+* `func (s *ModelStruct) AfterFind(*bongo.Collection)`
 
 The create/update hooks run immediately before the save hooks.
 	

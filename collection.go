@@ -68,9 +68,9 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 
 	// Validate?
 	if validator, ok := mod.(interface {
-		Validate() []string
+		Validate(*Collection) []string
 	}); ok {
-		errs := validator.Validate()
+		errs := validator.Validate(c)
 
 		if len(errs) > 0 {
 			err := NewSaveResult(false, errors.New("Validation failed"))
