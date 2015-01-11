@@ -10,7 +10,6 @@ import (
 	"labix.org/v2/mgo/bson"
 	"log"
 	"reflect"
-	"strings"
 	// "math"
 	// "strings"
 )
@@ -140,17 +139,11 @@ func (m *Connection) Register(mod interface{}, colName string) error {
 	typeOfT := s.Type()
 	for i := 0; i < s.NumField(); i++ {
 		// f := s.Field(i)
-		fieldName := typeOfT.Field(i).Name
 
 		// encrypt := stringInSlice(fieldName, encryptedFields)
 		bongo := typeOfT.Field(i).Tag.Get("bongo")
 		tags := getBongoTags(bongo)
-
-		var bsonName string
-		bsonName = typeOfT.Field(i).Tag.Get("bson")
-		if len(bsonName) == 0 {
-			bsonName = strings.ToLower(fieldName)
-		}
+		bsonName := GetBsonName(typeOfT.Field(i))
 
 		if tags.index {
 			idx := mgo.Index{

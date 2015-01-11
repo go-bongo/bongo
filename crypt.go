@@ -38,8 +38,8 @@ func Encrypt(key, val []byte) (string, error) {
 
 // Decrypt a base64-encoded string retrieved from the database and return an array of bytes
 func Decrypt(key []byte, encrypted string) ([]byte, error) {
-
 	val, err := base64.StdEncoding.DecodeString(encrypted)
+
 	if err != nil {
 		return nil, err
 	}

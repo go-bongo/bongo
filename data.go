@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"github.com/oleiade/reflections"
 	"labix.org/v2/mgo/bson"
-	// "log"
 	"reflect"
 	"strings"
 )
@@ -188,6 +187,7 @@ func (c *Collection) InitializeDocumentFromDB(encrypted map[string]interface{}, 
 				// key := c.Connection.GetEncryptionKey("asdf1234asdf1234")
 
 				if str, ok := data.(string); ok {
+
 					decrypted, err := Decrypt(key, str)
 					if err != nil {
 						panic(err)
