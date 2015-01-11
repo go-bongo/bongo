@@ -305,6 +305,8 @@ On the struct properties that are cascaded from related documents, you need to t
 
 You can also leave `ThroughProp` blank, in which case the properties of the document will be cascaded directly onto the related document. This is useful when you want to cascade `ObjectId` properties or other references, but it is important that you keep in mind that (a) these properties will be nullified on the related document when the main doc is deleted or changes references, and (b) they will fail decryption if you have encryption keys per collection, because currently there is no way to designate that property is cascaded from another collection unless it is a struct or slice of structs.
 
+Also note that like the above hooks, the `GetCascade` method will be passed the instance of the `bongo.Collection` so you can keep your models decoupled from your database layer.
+
 ### Casade Configuration
 ```go
 type CascadeConfig struct {
@@ -330,8 +332,8 @@ type CascadeConfig struct {
 
 ### Example
 ```go
-func (c *Child) GetCascade() []*bongo.CascadeConfig {
-
+func (c *Child) GetCascade(collection *bongo.Collection) []*bongo.CascadeConfig {
+	connection := collection.Connection
 	cascadeSingle := &bongo.CascadeConfig{
 		Collection:  connection.Collection("parents").Collection(),
 		Properties:  []string{"name"},

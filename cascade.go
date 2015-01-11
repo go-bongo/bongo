@@ -44,12 +44,12 @@ type CascadeConfig struct {
 
 // Cascades a document's properties to related documents, after it has been prepared
 // for db insertion (encrypted, etc)
-func CascadeSave(doc interface{}, preparedForSave map[string]interface{}) {
+func CascadeSave(collection *Collection, doc interface{}, preparedForSave map[string]interface{}) {
 	// Find out which properties to cascade
 	if conv, ok := doc.(interface {
-		GetCascade() []*CascadeConfig
+		GetCascade(*Collection) []*CascadeConfig
 	}); ok {
-		toCascade := conv.GetCascade()
+		toCascade := conv.GetCascade(collection)
 
 		for _, conf := range toCascade {
 			cascadeSaveWithConfig(conf, preparedForSave)
@@ -59,7 +59,7 @@ func CascadeSave(doc interface{}, preparedForSave map[string]interface{}) {
 
 				for results.Next(conf.Instance) {
 					prepared := conf.Collection.PrepDocumentForSave(conf.Instance)
-					CascadeSave(conf.Instance, prepared)
+					CascadeSave(conf.Collection, conf.Instance, prepared)
 				}
 
 			}
@@ -68,12 +68,12 @@ func CascadeSave(doc interface{}, preparedForSave map[string]interface{}) {
 }
 
 // Deletes references to a document from its related documents
-func CascadeDelete(doc interface{}) {
+func CascadeDelete(collection *Collection, doc interface{}) {
 	// Find out which properties to cascade
 	if conv, ok := doc.(interface {
-		GetCascade() []*CascadeConfig
+		GetCascade(*Collection) []*CascadeConfig
 	}); ok {
-		toCascade := conv.GetCascade()
+		toCascade := conv.GetCascade(collection)
 
 		// Get the ID
 		id, err := reflections.GetField(doc, "Id")

@@ -107,7 +107,7 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 	modelMap["_modified"] = time.Now()
 
 	// 4) Cascade?
-	CascadeSave(mod, modelMap)
+	CascadeSave(c, mod, modelMap)
 
 	// 5) Save (upsert)
 	_, err = c.Collection().UpsertId(modelMap["_id"], modelMap)
@@ -210,7 +210,7 @@ func (c *Collection) Delete(mod interface{}) error {
 		return err
 	}
 
-	CascadeDelete(mod)
+	CascadeDelete(c, mod)
 	if hook, ok := mod.(interface {
 		AfterDelete(*Collection)
 	}); ok {

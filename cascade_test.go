@@ -26,8 +26,9 @@ func (f *Parent) GetDiffTracker() *DiffTracker {
 	return f.diffTracker
 }
 
-func (c *Child) GetCascade() []*CascadeConfig {
+func (c *Child) GetCascade(collection *Collection) []*CascadeConfig {
 
+	connection := collection.Connection
 	cascadeSingle := &CascadeConfig{
 		Collection:  connection.Collection("parents"),
 		Properties:  []string{"name", "subChild.foo", "subChild._id"},
@@ -74,7 +75,8 @@ func (c *Child) GetCascade() []*CascadeConfig {
 	return []*CascadeConfig{cascadeSingle, cascadeMulti, cascadeCopy}
 }
 
-func (c *SubChild) GetCascade() []*CascadeConfig {
+func (c *SubChild) GetCascade(collection *Collection) []*CascadeConfig {
+	connection := collection.Connection
 	cascadeSingle := &CascadeConfig{
 		Collection:  connection.Collection("children"),
 		Properties:  []string{"foo"},
