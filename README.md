@@ -303,6 +303,8 @@ To use this feature, your struct needs to have an exported method called `GetCas
 
 On the struct properties that are cascaded from related documents, you need to tell Mongo not to save them, and how to decrypt them. (The related collection could have a different encryption key). To do this, use the `cascadedFrom={collectionName}` bongo tag, like so `bongo:"cascadedFrom=children"`. This will tell Bongo not to save those fields when you save your model (since they are supposed to be populated by the related documents), and also to decrypt those fields using the encryption key for the "children" collection, rather than the main model's collection.
 
+You can also leave `ThroughProp` blank, in which case the properties of the document will be cascaded directly onto the related document. This is useful when you want to cascade `ObjectId` properties or other references, but it is important that you keep in mind that (a) these properties will be nullified on the related document when the main doc is deleted or changes references, and (b) they will fail decryption if you have encryption keys per collection, because currently there is no way to designate that property is cascaded from another collection unless it is a struct or slice of structs.
+
 ### Casade Configuration
 ```go
 type CascadeConfig struct {

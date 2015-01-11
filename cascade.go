@@ -6,7 +6,6 @@ import (
 	"github.com/oleiade/reflections"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
-	// "log"
 	"strings"
 )
 
@@ -101,7 +100,13 @@ func cascadeDeleteWithConfig(conf *CascadeConfig, id bson.ObjectId) (*mgo.Change
 			"$set": map[string]interface{}{},
 		}
 
-		update["$set"][conf.ThroughProp] = nil
+		if len(conf.ThroughProp) > 0 {
+			update["$set"][conf.ThroughProp] = nil
+		} else {
+			for _, p := range conf.Properties {
+				update["$set"][p] = nil
+			}
+		}
 
 		return conf.Collection.Collection().UpdateAll(conf.Query, update)
 	case REL_MANY:
@@ -125,8 +130,10 @@ func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]inter
 	id := preparedForSave["_id"]
 
 	data := make(map[string]interface{})
-	// Set the id field automatically
-	data["_id"] = id
+	// Set the id field automatically if there's a through prop
+	if len(conf.ThroughProp) > 0 {
+		data["_id"] = id
+	}
 
 	for _, prop := range conf.Properties {
 		split := strings.Split(prop, ".")
@@ -169,7 +176,13 @@ func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]inter
 				"$set": map[string]interface{}{},
 			}
 
-			update1["$set"][conf.ThroughProp] = nil
+			if len(conf.ThroughProp) > 0 {
+				update1["$set"][conf.ThroughProp] = nil
+			} else {
+				for _, p := range conf.Properties {
+					update1["$set"][p] = nil
+				}
+			}
 			conf.Collection.Collection().UpdateAll(conf.OldQuery, update1)
 		}
 
@@ -177,7 +190,13 @@ func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]inter
 			"$set": map[string]interface{}{},
 		}
 
-		update["$set"][conf.ThroughProp] = data
+		if len(conf.ThroughProp) > 0 {
+			update["$set"][conf.ThroughProp] = data
+		} else {
+			for k, v := range data {
+				update["$set"][k] = v
+			}
+		}
 
 		// Just update
 		return conf.Collection.Collection().UpdateAll(conf.Query, update)

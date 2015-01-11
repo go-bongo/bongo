@@ -4,7 +4,6 @@ import (
 	// "fmt"
 	. "gopkg.in/check.v1"
 	"labix.org/v2/mgo/bson"
-	// "log"
 	"reflect"
 )
 
@@ -14,6 +13,7 @@ type Parent struct {
 	Number      int
 	Children    []*ChildRef `bongo:"cascadedFrom=children"`
 	Child       *ChildRef   `bongo:"cascadedFrom=children"`
+	ChildProp   string
 	diffTracker *DiffTracker
 }
 
@@ -38,6 +38,16 @@ func (c *Child) GetCascade() []*CascadeConfig {
 		},
 	}
 
+	cascadeCopy := &CascadeConfig{
+		Collection:  connection.Collection("parents"),
+		Properties:  []string{"childProp"},
+		ThroughProp: "",
+		RelType:     REL_ONE,
+		Query: bson.M{
+			"_id": c.ParentId,
+		},
+	}
+
 	cascadeMulti := &CascadeConfig{
 		Collection:  connection.Collection("parents"),
 		Properties:  []string{"name", "subChild.foo", "subChild._id"},
@@ -55,12 +65,13 @@ func (c *Child) GetCascade() []*CascadeConfig {
 				"_id": origId,
 			}
 			cascadeSingle.OldQuery = oldQuery
+			cascadeCopy.OldQuery = oldQuery
 			cascadeMulti.OldQuery = oldQuery
 		}
 
 	}
 
-	return []*CascadeConfig{cascadeSingle, cascadeMulti}
+	return []*CascadeConfig{cascadeSingle, cascadeMulti, cascadeCopy}
 }
 
 func (c *SubChild) GetCascade() []*CascadeConfig {
@@ -84,6 +95,7 @@ type Child struct {
 	ParentId    bson.ObjectId
 	Name        string `bongo:"encrypted"`
 	SubChild    *SubChildRef
+	ChildProp   string
 	diffTracker *DiffTracker
 }
 
@@ -141,8 +153,9 @@ func (s *TestSuite) TestCascade(c *C) {
 	c.Assert(res.Success, Equals, true)
 
 	child := &Child{
-		ParentId: parent.Id,
-		Name:     "Foo McGoo",
+		ParentId:  parent.Id,
+		Name:      "Foo McGoo",
+		ChildProp: "Doop McGoop",
 	}
 
 	res = childCollection.Save(child)
@@ -152,9 +165,12 @@ func (s *TestSuite) TestCascade(c *C) {
 	collection.FindById(parent.Id, newParent)
 
 	c.Assert(newParent.Child.Name, Equals, "Foo McGoo")
+
 	c.Assert(newParent.Child.Id.Hex(), Equals, child.Id.Hex())
 	c.Assert(newParent.Children[0].Name, Equals, "Foo McGoo")
 	c.Assert(newParent.Children[0].Id.Hex(), Equals, child.Id.Hex())
+	// No through prop should populate directly o the parent
+	c.Assert(newParent.ChildProp, Equals, "Doop McGoop")
 
 	// Now change the child parent Id...
 	child.ParentId = parent2.Id
@@ -169,9 +185,11 @@ func (s *TestSuite) TestCascade(c *C) {
 	newParent1 := &Parent{}
 	collection.FindById(parent.Id, newParent1)
 	c.Assert(newParent1.Child, IsNil)
+	c.Assert(newParent1.ChildProp, Equals, "")
 	c.Assert(len(newParent1.Children), Equals, 0)
 	newParent2 := &Parent{}
 	collection.FindById(parent2.Id, newParent2)
+	c.Assert(newParent2.ChildProp, Equals, "Doop McGoop")
 	c.Assert(newParent2.Child.Name, Equals, "Foo McGoo")
 	c.Assert(newParent2.Child.Id.Hex(), Equals, child.Id.Hex())
 	c.Assert(newParent2.Children[0].Name, Equals, "Foo McGoo")
@@ -197,6 +215,7 @@ func (s *TestSuite) TestCascade(c *C) {
 	c.Assert(err, Equals, nil)
 	collection.FindById(parent2.Id, newParent4)
 	c.Assert(newParent4.Child, IsNil)
+	c.Assert(newParent4.ChildProp, Equals, "")
 	c.Assert(len(newParent4.Children), Equals, 0)
 
 }
