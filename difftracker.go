@@ -182,7 +182,8 @@ func getChangedFields(struct1 interface{}, struct2 interface{}, useBson bool) ([
 				}
 			}
 		} else {
-			if field1.Interface() != field2.Interface() {
+			if !reflect.DeepEqual(field1.Interface(), field2.Interface()) {
+
 				diffs = append(diffs, fieldName)
 			}
 		}
