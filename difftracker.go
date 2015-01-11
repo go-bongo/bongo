@@ -162,7 +162,7 @@ func getChangedFields(struct1 interface{}, struct2 interface{}, useBson bool) ([
 
 			} else {
 				// Special for time.Time and bson.ObjectId
-				if childType.String() == "time.Time" || childType.String() == "bson.ObjectId" {
+				if strings.HasSuffix(childType.String(), "time.Time") || strings.HasSuffix(childType.String(), "bson.ObjectId") {
 					if fmt.Sprint(field1.Interface()) != fmt.Sprint(field2.Interface()) {
 						diffs = append(diffs, fieldName)
 					}
