@@ -8,7 +8,7 @@ import (
 	"github.com/oleiade/reflections"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
-	"log"
+	// "log"
 	"reflect"
 	// "math"
 	// "strings"
@@ -157,8 +157,6 @@ func (m *Connection) Register(mod interface{}, colName string) error {
 			if tags.unique {
 				idx.Unique = true
 			}
-
-			log.Printf("Ensuring index on %s.%s\n", colName, bsonName)
 
 			err := collection.Collection().EnsureIndex(idx)
 			if err != nil {

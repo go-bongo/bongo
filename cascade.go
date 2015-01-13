@@ -40,6 +40,9 @@ type CascadeConfig struct {
 
 	// An instance of the related doc if it needs to be nested
 	Instance interface{}
+
+	// If this is true, then just run the "remove" parts of the queries, instead of the remove + add
+	RemoveOnly bool
 }
 
 // Cascades a document's properties to related documents, after it has been prepared
@@ -183,7 +186,12 @@ func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]inter
 					update1["$set"][p] = nil
 				}
 			}
-			conf.Collection.Collection().UpdateAll(conf.OldQuery, update1)
+
+			ret, err := conf.Collection.Collection().UpdateAll(conf.OldQuery, update1)
+
+			if conf.RemoveOnly {
+				return ret, err
+			}
 		}
 
 		update := map[string]map[string]interface{}{
@@ -210,7 +218,10 @@ func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]inter
 		}
 
 		if len(conf.OldQuery) > 0 {
-			conf.Collection.Collection().UpdateAll(conf.OldQuery, update1)
+			ret, err := conf.Collection.Collection().UpdateAll(conf.OldQuery, update1)
+			if conf.RemoveOnly {
+				return ret, err
+			}
 		}
 
 		// Remove self from current relations, so we can replace it
