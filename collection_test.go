@@ -1,8 +1,8 @@
 package bongo
 
 import (
+	"github.com/maxwellhealth/mgo/bson"
 	. "gopkg.in/check.v1"
-	"labix.org/v2/mgo/bson"
 	"log"
 	// "testing"
 )
@@ -125,7 +125,7 @@ func (s *TestSuite) TestFindOne(c *C) {
 
 	c.Assert(err, Equals, nil)
 
-	c.Assert(result.Msg, Equals, "Foo")
+	c.Assert(string(result.Msg), Equals, "Foo")
 	// After find adds 5
 	c.Assert(result.Count, Equals, 12)
 
@@ -160,9 +160,9 @@ func (s *TestSuite) TestFind(c *C) {
 	for results.Next(res) {
 		count++
 		if count == 1 {
-			c.Assert(res.Msg, Equals, "Foo")
+			c.Assert(string(res.Msg), Equals, "Foo")
 		} else {
-			c.Assert(res.Msg, Equals, "Bar")
+			c.Assert(string(res.Msg), Equals, "Bar")
 		}
 	}
 
@@ -200,7 +200,7 @@ func (s *TestSuite) TestFindWithPagination(c *C) {
 	for results.Next(res) {
 		count++
 		if count == 1 {
-			c.Assert(res.Msg, Equals, "Foo")
+			c.Assert(string(res.Msg), Equals, "Foo")
 		}
 	}
 
@@ -214,7 +214,7 @@ func (s *TestSuite) TestFindWithPagination(c *C) {
 	for resultsPage2.Next(res) {
 		count2++
 		if count2 == 1 {
-			c.Assert(res.Msg, Equals, "Bar")
+			c.Assert(string(res.Msg), Equals, "Bar")
 		}
 	}
 
@@ -223,11 +223,11 @@ func (s *TestSuite) TestFindWithPagination(c *C) {
 }
 
 type RecursiveChild struct {
-	Bar string `bson:"bar" bongo:"encrypted"`
+	Bar EncryptedString `bson:"bar"`
 }
 type RecursiveParent struct {
 	Id    bson.ObjectId   `bson:"_id"`
-	Foo   string          `bson:"foo" bongo:"encrypted"`
+	Foo   EncryptedString `bson:"foo"`
 	Child *RecursiveChild `bson:"child"`
 }
 
@@ -247,7 +247,7 @@ func (s *TestSuite) TestRecursiveSaveWithEncryption(c *C) {
 
 	// Now fetch using bongo to decrypt...
 	connection.Collection("recursive_parent").FindById(parent.Id, newParent)
-	c.Assert(newParent.Child.Bar, Equals, "bar")
+	c.Assert(string(newParent.Child.Bar), Equals, "bar")
 
 	connection.Collection("recursive_parent").Collection().FindId(parent.Id).One(newParent)
 
@@ -271,7 +271,7 @@ func createAndSaveDocument() {
 	status := connection.Save(message)
 	// log.Println("status:", status.Success)
 	if status.Success != true {
-		log.Println(status.Error)
+		log.Println(status.Error())
 		panic(status.Error)
 	}
 }

@@ -2,8 +2,8 @@ package bongo
 
 import (
 	"encoding/json"
+	"github.com/maxwellhealth/mgo/bson"
 	"github.com/oleiade/reflections"
-	"labix.org/v2/mgo/bson"
 	"reflect"
 	"strings"
 )
@@ -19,8 +19,6 @@ func (c *Collection) PrepDocumentForSave(doc interface{}) map[string]interface{}
 	returnMap := make(map[string]interface{})
 
 	fields, _ := reflections.Tags(doc, "bson")
-
-	key := c.GetEncryptionKey()
 
 	var bsonName string
 	var bsons []string
@@ -46,43 +44,29 @@ func (c *Collection) PrepDocumentForSave(doc interface{}) map[string]interface{}
 		if len(bongoTags.cascadedFrom) > 0 {
 			continue
 		}
-		// Special types: bson.ObjectId, []bson.ObjectId,
-		if bongoTags.encrypted && !c.Connection.Config.DisableEncryption {
-			bytes, err := json.Marshal(val)
-			if err != nil {
-				panic(err)
-			}
-			encrypted, err := Encrypt(key, bytes)
 
-			if err != nil {
-				panic(err)
-			}
+		t := reflect.TypeOf(val)
+		rval := reflect.ValueOf(val)
+		// May need to iterate over sub documents with their own bson/encryption settings. It won't be a separate encryption key since it's not cascaded (that will be skipped above if bongoTags.cascaded)
+		if rval.IsValid() {
+			if shouldRecurse(t, rval) {
 
-			returnMap[bsonName] = encrypted
-		} else {
-			t := reflect.TypeOf(val)
-			rval := reflect.ValueOf(val)
-			// May need to iterate over sub documents with their own bson/encryption settings. It won't be a separate encryption key since it's not cascaded (that will be skipped above if bongoTags.cascaded)
-			if rval.IsValid() {
-				if shouldRecurse(t, rval) {
-
-					// Recurse only if not nil
-					if t.Kind() == reflect.Struct || !rval.IsNil() {
-						returnMap[bsonName] = c.PrepDocumentForSave(val)
-					}
-				} else if t.String() == "bson.ObjectId" {
-					// We won't catch "omitempty"
-					if idVal, ok := val.(bson.ObjectId); ok {
-						if idVal.Valid() {
-							returnMap[bsonName] = idVal
-						}
-					}
-				} else {
-					returnMap[bsonName] = val
+				// Recurse only if not nil
+				if t.Kind() == reflect.Struct || !rval.IsNil() {
+					returnMap[bsonName] = c.PrepDocumentForSave(val)
 				}
+			} else if t.String() == "bson.ObjectId" {
+				// We won't catch "omitempty"
+				if idVal, ok := val.(bson.ObjectId); ok {
+					if idVal.Valid() {
+						returnMap[bsonName] = idVal
+					}
+				}
+			} else {
+				returnMap[bsonName] = val
 			}
-
 		}
+
 	}
 
 	return returnMap
@@ -231,9 +215,10 @@ func (c *Collection) InitializeDocumentFromDB(encrypted map[string]interface{}, 
 
 	decoder, err := NewDecoder(decoderConfig)
 
+	// log.Println("Decoding ", encrypted)
 	// Decode the decrypted map into the doc, then set the other fields on the doc
 	err = decoder.Decode(encrypted)
-
+	// log.Println("Decoded", doc)
 	if err != nil {
 		panic(err)
 	}

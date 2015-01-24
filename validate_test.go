@@ -1,8 +1,8 @@
 package bongo
 
 import (
+	"github.com/maxwellhealth/mgo/bson"
 	. "gopkg.in/check.v1"
-	"labix.org/v2/mgo/bson"
 )
 
 func (s *TestSuite) TestValidateRequired(c *C) {

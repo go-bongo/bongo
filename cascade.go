@@ -3,9 +3,10 @@ package bongo
 import (
 	"errors"
 	"github.com/maxwellhealth/dotaccess"
+	"github.com/maxwellhealth/mgo"
+	"github.com/maxwellhealth/mgo/bson"
 	"github.com/oleiade/reflections"
-	"labix.org/v2/mgo"
-	"labix.org/v2/mgo/bson"
+	// "log"
 	"strings"
 )
 

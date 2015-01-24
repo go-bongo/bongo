@@ -1,7 +1,7 @@
 package bongo
 
 import (
-	"labix.org/v2/mgo"
+	"github.com/maxwellhealth/mgo"
 	"math"
 )
 
@@ -21,7 +21,6 @@ type PaginationInfo struct {
 }
 
 func (r *ResultSet) Next(mod interface{}) bool {
-	returnMap := make(map[string]interface{})
 
 	// Check if the iter has been instantiated yet
 	if !r.loadedIter {
@@ -29,10 +28,9 @@ func (r *ResultSet) Next(mod interface{}) bool {
 		r.loadedIter = true
 	}
 
-	gotResult := r.Iter.Next(returnMap)
+	gotResult := r.Iter.Next(mod)
 
 	if gotResult {
-		r.Collection.InitializeDocumentFromDB(returnMap, mod)
 
 		if hook, ok := mod.(interface {
 			AfterFind(*Collection)

@@ -629,7 +629,6 @@ func (d *Decoder) decodeStruct(name string, data interface{}, val reflect.Value)
 
 	// If it's already a struct...
 	if dataValKind == reflect.Struct {
-		// fmt.Println(name, "Is already a struct")
 		val.Set(dataVal)
 
 		// Reset cascadedFrom so we use the root-level collection name for encryption key detection

@@ -2,10 +2,10 @@ package bongo
 
 import (
 	"errors"
-	"fmt"
+	// "fmt"
+	"github.com/maxwellhealth/mgo"
+	"github.com/maxwellhealth/mgo/bson"
 	"github.com/oleiade/reflections"
-	"labix.org/v2/mgo"
-	"labix.org/v2/mgo/bson"
 	"time"
 	// "log"
 	// "reflect"
@@ -27,19 +27,19 @@ func (c *Collection) Collection() *mgo.Collection {
 }
 
 func (c *Collection) Save(mod interface{}) (result *SaveResult) {
-	defer func() {
+	// defer func() {
 
-		if r := recover(); r != nil {
-			if e, ok := r.(error); ok {
-				result = NewSaveResult(false, e)
-			} else if e, ok := r.(string); ok {
-				result = NewSaveResult(false, errors.New(e))
-			} else {
-				result = NewSaveResult(false, errors.New(fmt.Sprint(r)))
-			}
+	// 	if r := recover(); r != nil {
+	// 		if e, ok := r.(error); ok {
+	// 			result = NewSaveResult(false, e)
+	// 		} else if e, ok := r.(string); ok {
+	// 			result = NewSaveResult(false, errors.New(e))
+	// 		} else {
+	// 			result = NewSaveResult(false, errors.New(fmt.Sprint(r)))
+	// 		}
 
-		}
-	}()
+	// 	}
+	// }()
 
 	// 1) Make sure mod has an Id field
 	ensureIdField(mod)
@@ -55,7 +55,7 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 	isNew := false
 
 	if !id.Valid() {
-		id := bson.NewObjectId()
+		id = bson.NewObjectId()
 		err := reflections.SetField(mod, "Id", id)
 
 		if err != nil {
@@ -97,7 +97,7 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 		hook.BeforeSave(c)
 	}
 
-	// 3) Convert the model into a map using the crypt library
+	// 3) Convert the model into a map so we can automatically set the bson to camel case and add created a modified timestamps
 	modelMap := c.PrepDocumentForSave(mod)
 
 	// Add created/modified time
@@ -110,7 +110,7 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 	CascadeSave(c, mod, modelMap)
 
 	// 5) Save (upsert)
-	_, err = c.Collection().UpsertId(modelMap["_id"], modelMap)
+	_, err = c.Collection().UpsertId(id, modelMap)
 
 	if err != nil {
 		panic(err)
@@ -145,16 +145,11 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 }
 
 func (c *Collection) FindById(id bson.ObjectId, mod interface{}) error {
-	returnMap := make(map[string]interface{})
 
-	err := c.Collection().FindId(id).One(&returnMap)
+	err := c.Collection().FindId(id).One(mod)
 	if err != nil {
 		return err
 	}
-
-	// Decrypt + Marshal into map
-
-	c.InitializeDocumentFromDB(returnMap, mod)
 
 	if hook, ok := mod.(interface {
 		AfterFind(*Collection)

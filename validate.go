@@ -1,7 +1,7 @@
 package bongo
 
 import (
-	"labix.org/v2/mgo/bson"
+	"github.com/maxwellhealth/mgo/bson"
 	"reflect"
 )
 

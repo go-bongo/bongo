@@ -1,8 +1,8 @@
 package bongo
 
 import (
+	"github.com/maxwellhealth/mgo/bson"
 	. "gopkg.in/check.v1"
-	"labix.org/v2/mgo/bson"
 	"log"
 	"testing"
 )
@@ -26,9 +26,9 @@ type Nested struct {
 }
 
 type FooBar struct {
-	Id    bson.ObjectId `bson:"_id"`
-	Msg   string        `bongo:"encrypted" bson:"msg"`
-	Count int           `bongo:"index"`
+	Id    bson.ObjectId   `bson:"_id"`
+	Msg   EncryptedString `bongo:"encrypted" bson:"msg"`
+	Count int             `bongo:"index"`
 	Child *Nested
 }
 

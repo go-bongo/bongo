@@ -71,6 +71,9 @@ type Person struct {
 }
 ```
 
+### Note on Encryption
+If you have an encrypted field that is a pointer to a `struct`, you need to make sure that field is instantiated on any model you are saving to the database. Otherwise the encrypted string will end up as "null" and the marshaler will have issues trying to marshal that back into a struct.
+
 ### Indexing
 
 You can use tags to ensure indeces on your collections. The mere presence of an `index` tag will cause Bongo to ensure an index on that field when your model is registered. If you also have the "unique" tag, it will be a unique index.
@@ -165,7 +168,7 @@ err := connection.Collection("people").Delete(person)
 Same thing applies re: collection name. This will look in "person" and populate the reference of `person`:
 
 ```go
-import "labix.org/v2/mgo/bson"
+import "github.com/maxwellhealth/mgo/bson"
 
 ...
 
@@ -177,7 +180,7 @@ err := connection.FindById(bson.ObjectIdHex(StringId), person)
 And this will look in "people":
 
 ```go
-import "labix.org/v2/mgo/bson"
+import "github.com/maxwellhealth/mgo/bson"
 
 ...
 
@@ -222,7 +225,7 @@ Same as find, but it will populate the reference of the struct you provide as th
 
 ```go
 import (
-	"labix.org/v2/mgo/bson"
+	"github.com/maxwellhealth/mgo/bson"
 	"fmt"
 )
 
