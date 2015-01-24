@@ -18,10 +18,6 @@ type Collection struct {
 	Connection *Connection
 }
 
-func (c *Collection) GetEncryptionKey() []byte {
-	return c.Connection.GetEncryptionKey(c.Name)
-}
-
 func (c *Collection) Collection() *mgo.Collection {
 	return c.Connection.Session.DB(c.Connection.Config.Database).C(c.Name)
 }

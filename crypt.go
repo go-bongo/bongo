@@ -79,127 +79,184 @@ func Decrypt(key []byte, encrypted string) ([]byte, error) {
 	return val, nil
 }
 
-var encryptionKey = []byte("asdf1234asdf1234")
-
 //* ENCRYPTED TYPES */
 type EncryptedString string
 
 func (e EncryptedString) GetBSON() (interface{}, error) {
+	if len(EncryptionKey) > 0 {
+		return Encrypt(EncryptionKey, []byte(string(e)))
+	} else {
+		return string(e), nil
+	}
 
-	return Encrypt(encryptionKey, []byte(string(e)))
 }
 func (e *EncryptedString) SetBSON(raw bson.Raw) error {
+	if len(EncryptionKey) > 0 {
+		var str string
+		raw.Unmarshal(&str)
+		// log.Println("Unmarshaled into", str)
+		decrypted, err := Decrypt(EncryptionKey, str)
+		if err != nil {
+			return err
+		}
+		*e = EncryptedString(string(decrypted))
+	} else {
+		var s string
+		raw.Unmarshal(&s)
+		*e = EncryptedString(s)
 
-	var str string
-	raw.Unmarshal(&str)
-	// log.Println("Unmarshaled into", str)
-	decrypted, err := Decrypt(encryptionKey, str)
-	if err != nil {
-		return err
 	}
-	*e = EncryptedString(string(decrypted))
 	return nil
+
 }
 
 type EncryptedInt int
 
 func (e EncryptedInt) GetBSON() (interface{}, error) {
-	return Encrypt(encryptionKey, []byte(strconv.Itoa(int(e))))
-}
-func (e *EncryptedInt) SetBSON(raw bson.Raw) error {
-	var str string
-	raw.Unmarshal(&str)
-	decrypted, err := Decrypt(encryptionKey, str)
-	if err != nil {
-		return err
+	if len(EncryptionKey) > 0 {
+		return Encrypt(EncryptionKey, []byte(strconv.Itoa(int(e))))
+	} else {
+		return int(e), nil
 	}
 
-	intVal, err := strconv.Atoi(string(decrypted))
-	if err != nil {
-		return err
+}
+func (e *EncryptedInt) SetBSON(raw bson.Raw) error {
+	if len(EncryptionKey) > 0 {
+		var str string
+		raw.Unmarshal(&str)
+		decrypted, err := Decrypt(EncryptionKey, str)
+		if err != nil {
+			return err
+		}
+
+		intVal, err := strconv.Atoi(string(decrypted))
+		if err != nil {
+			return err
+		}
+		*e = EncryptedInt(intVal)
+
+	} else {
+		var i int
+		raw.Unmarshal(&i)
+		*e = EncryptedInt(i)
 	}
-	*e = EncryptedInt(intVal)
 	return nil
 }
 
 type EncryptedFloat float64
 
 func (e EncryptedFloat) GetBSON() (interface{}, error) {
-	// return float64(e)
-	marshaled, err := json.Marshal(float64(e))
-	if err != nil {
-		return nil, err
+
+	if len(EncryptionKey) > 0 {
+		marshaled, err := json.Marshal(float64(e))
+		if err != nil {
+			return nil, err
+		}
+		return Encrypt(EncryptionKey, marshaled)
+	} else {
+		return float64(e), nil
 	}
-	return Encrypt(encryptionKey, marshaled)
+
 }
 
 func (e *EncryptedFloat) SetBSON(raw bson.Raw) error {
-	var str string
-	raw.Unmarshal(&str)
-	decrypted, err := Decrypt(encryptionKey, str)
-	if err != nil {
-		return err
+	if len(EncryptionKey) > 0 {
+		var str string
+		raw.Unmarshal(&str)
+		decrypted, err := Decrypt(EncryptionKey, str)
+		if err != nil {
+			return err
+		}
+
+		var f float64
+		err = json.Unmarshal(decrypted, &f)
+		if err != nil {
+			return err
+		}
+		*e = EncryptedFloat(f)
+	} else {
+		var f float64
+		raw.Unmarshal(&f)
+		*e = EncryptedFloat(f)
 	}
 
-	var f float64
-	err = json.Unmarshal(decrypted, &f)
-	if err != nil {
-		return err
-	}
-	*e = EncryptedFloat(f)
 	return nil
 }
 
 type EncryptedBool bool
 
 func (e EncryptedBool) GetBSON() (interface{}, error) {
-	var toEncrypt []byte
-	if e == true {
-		toEncrypt = []byte{0x01}
+	if len(EncryptionKey) > 0 {
+		var toEncrypt []byte
+		if e == true {
+			toEncrypt = []byte{0x01}
+		} else {
+			toEncrypt = []byte{0x00}
+		}
+		return Encrypt(EncryptionKey, toEncrypt)
 	} else {
-		toEncrypt = []byte{0x00}
-	}
-	return Encrypt(encryptionKey, toEncrypt)
-}
-func (e *EncryptedBool) SetBSON(raw bson.Raw) error {
-	var str string
-	raw.Unmarshal(&str)
-	decrypted, err := Decrypt(encryptionKey, str)
-	if err != nil {
-		return err
+		return bool(e), nil
 	}
 
-	if decrypted[0] == 0x01 {
-		*e = true
+}
+func (e *EncryptedBool) SetBSON(raw bson.Raw) error {
+	if len(EncryptionKey) > 0 {
+		var str string
+		raw.Unmarshal(&str)
+		decrypted, err := Decrypt(EncryptionKey, str)
+		if err != nil {
+			return err
+		}
+
+		if decrypted[0] == 0x01 {
+			*e = true
+		} else {
+			*e = false
+		}
 	} else {
-		*e = false
+		var b bool
+		raw.Unmarshal(&b)
+		*e = EncryptedBool(b)
 	}
+
 	return nil
 }
 
 type EncryptedDate time.Time
 
 func (e EncryptedDate) GetBSON() (interface{}, error) {
-	d := time.Time(e)
-	return Encrypt(encryptionKey, []byte(d.String()))
+	if len(EncryptionKey) > 0 {
+		d := time.Time(e)
+		return Encrypt(EncryptionKey, []byte(d.String()))
+	} else {
+		return time.Time(e), nil
+	}
+
 }
 func (e *EncryptedDate) SetBSON(raw bson.Raw) error {
+	if len(EncryptionKey) > 0 {
+		var str string
+		raw.Unmarshal(&str)
+		// log.Println("Unmarshaled into", str)
+		decrypted, err := Decrypt(EncryptionKey, str)
 
-	var str string
-	raw.Unmarshal(&str)
-	// log.Println("Unmarshaled into", str)
-	decrypted, err := Decrypt(encryptionKey, str)
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		return err
+		t, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", string(decrypted))
+
+		if err != nil {
+			return err
+		}
+
+		*e = EncryptedDate(t)
+
+	} else {
+		var t time.Time
+		raw.Unmarshal(&t)
+		*e = EncryptedDate(t)
 	}
-
-	t, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", string(decrypted))
-
-	if err != nil {
-		return err
-	}
-
-	*e = EncryptedDate(t)
 	return nil
+
 }

@@ -61,12 +61,12 @@ func (f *FooBar) AfterFind(c *Collection) {
 var config = &Config{
 	ConnectionString: "localhost",
 	Database:         "gotest",
-	EncryptionKey:    key,
 }
 
 var connection, _ = Connect(config)
 
 func (s *TestSuite) SetUpTest(c *C) {
+	EncryptionKey = []byte("asdf1234asdf1234")
 	connection.Session.DB(config.Database).DropDatabase()
 	if !testing.Verbose() {
 		log.SetOutput(new(NullWriter))

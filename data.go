@@ -1,7 +1,7 @@
 package bongo
 
 import (
-	"encoding/json"
+	// "encoding/json"
 	"github.com/maxwellhealth/mgo/bson"
 	"github.com/oleiade/reflections"
 	"reflect"
@@ -128,99 +128,5 @@ func getBongoTags(tag string) *bongoTags {
 		}
 	}
 	return ret
-
-}
-
-// func stringInSlice(a string, list []string) bool {
-// 	for _, b := range list {
-// 		if b == a {
-// 			return true
-// 		}
-// 	}
-// 	return false
-// }
-
-// Decrypt a struct. Use tag `encrypted="true"` to designate fields as needing to be decrypted
-func (c *Collection) InitializeDocumentFromDB(encrypted map[string]interface{}, doc interface{}) {
-
-	decoderHook := func(data interface{}, to reflect.Value, decoder *Decoder) (interface{}, error) {
-		if c.Connection.Config.DisableEncryption {
-			return data, nil
-		}
-		// If we're inside an encrypted prop, that means it's already been json-decoded and is just being marshaled into its final value. In that case we don't even care, so just let it go through (you can't have nested encryption)
-		if decoder.InEncryptedProp {
-			return data, nil
-		}
-		currentField := decoder.CurrentField
-
-		// log.Println("Current field:", currentField)
-		if len(currentField.Tag) > 0 {
-
-			colName := c.Name
-			if len(decoder.CascadedFrom) > 0 {
-				colName = decoder.CascadedFrom
-			}
-
-			// Check bongo fields
-			bongoConfig := getBongoTags(currentField.Tag.Get("bongo"))
-			// log.Println("Decoding", dataVal, to)
-			if bongoConfig.encrypted {
-				// Decrypt it
-				key := c.Connection.GetEncryptionKey(colName)
-				// log.Println("Decoding", data, "from collection", colName, "in struct field", currentField)
-				// key := c.Connection.GetEncryptionKey("asdf1234asdf1234")
-
-				if str, ok := data.(string); ok {
-
-					decrypted, err := Decrypt(key, str)
-					if err != nil {
-						panic(err)
-					}
-
-					newVal := reflect.New(to.Type()).Interface()
-
-					// Special case for object ID since it'll whine if it's not set
-					if strings.HasSuffix(to.Type().String(), "ObjectId") && string(decrypted) == "\"\"" {
-						return "", nil
-					}
-					// log.Println(reflect.TypeOf(newVal))
-					err = json.Unmarshal(decrypted, newVal)
-					if err != nil {
-						panic(err)
-					}
-
-					if !reflect.ValueOf(newVal).IsValid() {
-						// log.Println(newVal, "isn't valid")
-						return data, nil
-					}
-
-					value := reflectValue(newVal).Interface()
-					// log.Println("Decrypted into", value)
-					return value, nil
-
-				}
-
-			}
-		}
-
-		return data, nil
-	}
-
-	// New decoder using the bson mapping
-	decoderConfig := &DecoderConfig{
-		TagName:    "bson",
-		Result:     doc,
-		DecodeHook: decoderHook,
-	}
-
-	decoder, err := NewDecoder(decoderConfig)
-
-	// log.Println("Decoding ", encrypted)
-	// Decode the decrypted map into the doc, then set the other fields on the doc
-	err = decoder.Decode(encrypted)
-	// log.Println("Decoded", doc)
-	if err != nil {
-		panic(err)
-	}
 
 }

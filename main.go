@@ -15,12 +15,11 @@ import (
 )
 
 type Config struct {
-	ConnectionString           string
-	Database                   string
-	EncryptionKey              []byte
-	EncryptionKeyPerCollection map[string][]byte
-	DisableEncryption          bool
+	ConnectionString string
+	Database         string
 }
+
+var EncryptionKey = []byte{}
 
 type SaveResult struct {
 	Success          bool
@@ -87,17 +86,6 @@ func (m *Connection) Connect() (err error) {
 	m.Session = session
 
 	return nil
-}
-
-func (m *Connection) GetEncryptionKey(collection string) []byte {
-	key, has := m.Config.EncryptionKeyPerCollection[collection]
-
-	if has {
-		return key
-	} else {
-		return m.Config.EncryptionKey
-	}
-
 }
 
 func (m *Connection) Collection(name string) *Collection {

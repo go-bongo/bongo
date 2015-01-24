@@ -134,11 +134,6 @@ func (s *TestSuite) TestCascade(c *C) {
 
 	collection := connection.Collection("parents")
 
-	connection.Config.EncryptionKeyPerCollection = map[string][]byte{
-		"parents":  []byte("asdf1234asdf1234"),
-		"children": []byte("1234asdf1234asdf"),
-	}
-
 	childCollection := connection.Collection("children")
 	subchildCollection := connection.Collection("subchildren")
 	parent := &Parent{
