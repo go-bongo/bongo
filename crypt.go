@@ -29,12 +29,6 @@ import (
 
 //** BYTE-LEVEL PRIMITIVE METHODS
 
-// For some reason when we get the raw data back it has a byte value in front
-func parseEncryptedString(str string) string {
-	// log.Println("Parsing encrypted string")
-	return str[1:]
-}
-
 // Encrypt an array of bytes for storage in the database as a base64 encoded string
 func Encrypt(key, val []byte) (string, error) {
 
@@ -259,4 +253,44 @@ func (e *EncryptedDate) SetBSON(raw bson.Raw) error {
 	}
 	return nil
 
+}
+
+type EncryptedMap map[string]interface{}
+
+func (e EncryptedMap) GetBSON() (interface{}, error) {
+
+	if len(EncryptionKey) > 0 {
+		marshaled, err := json.Marshal(map[string]interface{}(e))
+		if err != nil {
+			return nil, err
+		}
+		return Encrypt(EncryptionKey, marshaled)
+	} else {
+		return map[string]interface{}(e), nil
+	}
+
+}
+
+func (e *EncryptedMap) SetBSON(raw bson.Raw) error {
+	if len(EncryptionKey) > 0 {
+		var str string
+		raw.Unmarshal(&str)
+		decrypted, err := Decrypt(EncryptionKey, str)
+		if err != nil {
+			return err
+		}
+
+		m := make(map[string]interface{})
+		err = json.Unmarshal(decrypted, &m)
+		if err != nil {
+			return err
+		}
+		*e = EncryptedMap(m)
+	} else {
+		m := make(map[string]interface{})
+		raw.Unmarshal(m)
+		*e = EncryptedMap(m)
+	}
+
+	return nil
 }
