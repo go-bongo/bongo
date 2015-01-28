@@ -33,7 +33,7 @@ func (s *TestSuite) TestRawCryptDecrypt(c *C) {
 }
 
 func (s *TestSuite) TestEncryptedTypes(c *C) {
-	date := time.Now()
+	date := time.Now().Format(iso8601Format)
 
 	mp := map[string]interface{}{
 		"foo":  "bar",
@@ -58,7 +58,7 @@ func (s *TestSuite) TestEncryptedTypes(c *C) {
 	c.Assert(string(newStruct.String), Equals, "foo")
 	c.Assert(float64(newStruct.Float), Equals, 5.555)
 	c.Assert(int(newStruct.Int), Equals, 6)
-	c.Assert(time.Time(newStruct.Date), Equals, date)
+	c.Assert(newStruct.Date, Equals, EncryptedDate(date))
 
 	newMp := map[string]interface{}(newStruct.Map)
 	c.Assert(newMp["foo"], Equals, "bar")
