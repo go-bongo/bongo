@@ -7,7 +7,6 @@ import (
 	"github.com/maxwellhealth/mgo/bson"
 	"github.com/oleiade/reflections"
 	"time"
-	// "log"
 	// "reflect"
 	// "math"
 	// "strings"
@@ -176,6 +175,9 @@ func (c *Collection) FindOne(query interface{}, mod interface{}) error {
 	hasNext := results.Next(mod)
 
 	if !hasNext {
+		if results.Error != nil {
+			return results.Error
+		}
 		return errors.New("No results found")
 	}
 

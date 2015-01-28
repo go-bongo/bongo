@@ -15,12 +15,12 @@ import (
 
 	"errors"
 	"github.com/maxwellhealth/mgo/bson"
-	// "log"
 	"strconv"
 	"time"
 	// "strings"
 	// "fmt"
 
+	// "log"
 	// "github.com/oleiade/reflections"
 	"io"
 )
@@ -60,7 +60,7 @@ func Decrypt(key []byte, encrypted string) ([]byte, error) {
 		return nil, err
 	}
 	if len(val) < aes.BlockSize {
-		return nil, errors.New("ciphertext too short")
+		return nil, errors.New("ciphertext too short (" + encrypted + ")")
 	}
 	iv := val[:aes.BlockSize]
 	val = val[aes.BlockSize:]
@@ -216,16 +216,27 @@ func (e *EncryptedBool) SetBSON(raw bson.Raw) error {
 	return nil
 }
 
-type EncryptedDate time.Time
+// Making this an extension of time.Time causes errors with marshaling, so we'll make it a string and use time.Time internally
+type EncryptedDate string
+
+var iso8601Format = "2006-01-02T15:04:05-0700"
 
 func (e EncryptedDate) GetBSON() (interface{}, error) {
-	if len(EncryptionKey) > 0 {
-		d := time.Time(e)
-		return Encrypt(EncryptionKey, []byte(d.String()))
-	} else {
-		return time.Time(e), nil
-	}
+	if len(e) > 0 && e != "null" {
+		d, err := e.GetTime()
 
+		if err != nil {
+			return nil, err
+		}
+		if len(EncryptionKey) > 0 {
+
+			return Encrypt(EncryptionKey, []byte(d.Format(iso8601Format)))
+		} else {
+			return d, nil
+		}
+	} else {
+		return Encrypt(EncryptionKey, []byte{})
+	}
 }
 func (e *EncryptedDate) SetBSON(raw bson.Raw) error {
 	if len(EncryptionKey) > 0 {
@@ -233,26 +244,30 @@ func (e *EncryptedDate) SetBSON(raw bson.Raw) error {
 		raw.Unmarshal(&str)
 		// log.Println("Unmarshaled into", str)
 		decrypted, err := Decrypt(EncryptionKey, str)
-
 		if err != nil {
 			return err
 		}
 
-		t, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", string(decrypted))
+		if len(decrypted) > 0 {
+			t, err := time.Parse(iso8601Format, string(decrypted))
 
-		if err != nil {
-			return err
+			if err != nil {
+				return err
+			}
+
+			*e = EncryptedDate(t.Format(iso8601Format))
 		}
-
-		*e = EncryptedDate(t)
-
 	} else {
 		var t time.Time
 		raw.Unmarshal(&t)
-		*e = EncryptedDate(t)
+		*e = EncryptedDate(t.Format(iso8601Format))
 	}
 	return nil
 
+}
+
+func (e EncryptedDate) GetTime() (time.Time, error) {
+	return time.Parse(iso8601Format, string(e))
 }
 
 type EncryptedMap map[string]interface{}

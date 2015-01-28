@@ -10,6 +10,7 @@ type ResultSet struct {
 	Iter       *mgo.Iter
 	loadedIter bool
 	Collection *Collection
+	Error      error
 }
 
 type PaginationInfo struct {
@@ -38,6 +39,11 @@ func (r *ResultSet) Next(mod interface{}) bool {
 			hook.AfterFind(r.Collection)
 		}
 		return true
+	}
+
+	err := r.Iter.Err()
+	if err != nil {
+		r.Error = err
 	}
 
 	return false
