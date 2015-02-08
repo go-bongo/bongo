@@ -92,7 +92,13 @@ func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 	if info.Current < info.TotalPages {
 		info.RecordsOnPage = info.PerPage
 	} else {
+
 		info.RecordsOnPage = int(math.Mod(float64(count), float64(perPage)))
+
+		if info.RecordsOnPage == 0 && count > 0 {
+			info.RecordsOnPage = perPage
+		}
+
 	}
 
 	return info, nil

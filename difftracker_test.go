@@ -13,6 +13,7 @@ type FooChangeTest struct {
 	IntVal      int
 	Timestamp   time.Time
 	diffTracker *DiffTracker
+	Arr         []string
 }
 
 func (f *FooChangeTest) GetDiffTracker() *DiffTracker {
@@ -33,10 +34,12 @@ func (s *TestSuite) TestGetChangedFields(c *C) {
 	foo1 := &FooChangeTest{
 		StringVal: "foo",
 		IntVal:    1,
+		Arr:       []string{},
 	}
 	foo2 := &FooChangeTest{
 		StringVal: "bar",
 		IntVal:    2,
+		Arr:       []string{},
 	}
 
 	diffs, err := getChangedFields(foo1, foo2, false)

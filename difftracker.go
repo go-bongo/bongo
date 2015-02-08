@@ -131,6 +131,14 @@ func getChangedFields(struct1 interface{}, struct2 interface{}, useBson bool) ([
 		field2 := val2.Field(i)
 
 		field := type1.Field(i)
+		tags := strings.Split(field.Tag.Get("bson"), ",")
+		inline := false
+		for _, t := range tags {
+			if t == "inline" {
+				inline = true
+				break
+			}
+		}
 
 		var fieldName string
 		if useBson {
@@ -178,12 +186,17 @@ func getChangedFields(struct1 interface{}, struct2 interface{}, useBson bool) ([
 
 			if len(childDiffs) > 0 {
 				for _, diff := range childDiffs {
-					diffs = append(diffs, strings.Join([]string{fieldName, diff}, "."))
+					if inline {
+						diffs = append(diffs, diff)
+					} else {
+						diffs = append(diffs, strings.Join([]string{fieldName, diff}, "."))
+					}
+
 				}
 			}
 		} else {
-			if !reflect.DeepEqual(field1.Interface(), field2.Interface()) {
 
+			if fmt.Sprint(field1.Interface()) != fmt.Sprint(field2.Interface()) {
 				diffs = append(diffs, fieldName)
 			}
 		}

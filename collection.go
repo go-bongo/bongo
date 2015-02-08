@@ -17,6 +17,12 @@ type Collection struct {
 	Connection *Connection
 }
 
+type DocumentNotFoundError struct{}
+
+func (d DocumentNotFoundError) Error() string {
+	return "Document not found"
+}
+
 func (c *Collection) Collection() *mgo.Collection {
 	return c.Connection.Session.DB(c.Connection.Config.Database).C(c.Name)
 }
@@ -92,8 +98,27 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 		hook.BeforeSave(c)
 	}
 
-	// 3) Convert the model into a map so we can automatically set the bson to camel case and add created a modified timestamps
+	// 3) Convert the model into a map so we can automatically set the bson to camel case, add created and modified timestamps, filter out properties that are "cascadedFrom", etc
 	modelMap := c.PrepDocumentForSave(mod)
+
+	// Run hook for Before(Create/Update/Save)Map.
+	if isNew {
+		if hook, ok := mod.(interface {
+			BeforeCreateMap(*Collection, map[string]interface{})
+		}); ok {
+			hook.BeforeCreateMap(c, modelMap)
+		}
+	} else if hook, ok := mod.(interface {
+		BeforeUpdateMap(*Collection, map[string]interface{})
+	}); ok {
+		hook.BeforeUpdateMap(c, modelMap)
+	}
+
+	if hook, ok := mod.(interface {
+		BeforeSaveMap(*Collection, map[string]interface{})
+	}); ok {
+		hook.BeforeSaveMap(c, modelMap)
+	}
 
 	// Add created/modified time
 	if isNew {
@@ -102,7 +127,10 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 	modelMap["_modified"] = time.Now()
 
 	// 4) Cascade?
-	CascadeSave(c, mod, modelMap)
+	err = CascadeSave(c, mod, modelMap)
+	if err != nil {
+		panic(err)
+	}
 
 	// 5) Save (upsert)
 	_, err = c.Collection().UpsertId(id, modelMap)
@@ -178,7 +206,7 @@ func (c *Collection) FindOne(query interface{}, mod interface{}) error {
 		if results.Error != nil {
 			return results.Error
 		}
-		return errors.New("No results found")
+		return &DocumentNotFoundError{}
 	}
 
 	return nil

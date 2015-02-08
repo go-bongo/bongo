@@ -34,7 +34,7 @@ func (c *Child) GetCascade(collection *Collection) []*CascadeConfig {
 	connection := collection.Connection
 	cascadeSingle := &CascadeConfig{
 		Collection:  connection.Collection("parents"),
-		Properties:  []string{"name", "subChild.foo", "subChild._id"},
+		Properties:  []string{"_id", "name", "subChild.foo", "subChild._id"},
 		ThroughProp: "child",
 		RelType:     REL_ONE,
 		Query: bson.M{
@@ -82,7 +82,7 @@ func (c *SubChild) GetCascade(collection *Collection) []*CascadeConfig {
 	connection := collection.Connection
 	cascadeSingle := &CascadeConfig{
 		Collection:  connection.Collection("children"),
-		Properties:  []string{"foo"},
+		Properties:  []string{"_id", "foo"},
 		ThroughProp: "subChild",
 		RelType:     REL_ONE,
 		Query: bson.M{

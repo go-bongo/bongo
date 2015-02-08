@@ -6,7 +6,6 @@ import (
 	"github.com/maxwellhealth/mgo"
 	"github.com/maxwellhealth/mgo/bson"
 	"github.com/oleiade/reflections"
-	// "log"
 	"strings"
 )
 
@@ -15,6 +14,11 @@ const (
 	REL_MANY = iota
 	REL_ONE  = iota
 )
+
+type ReferenceField struct {
+	BsonName string
+	Value    interface{}
+}
 
 // Configuration to tell Bongo how to cascade data to related documents on save or delete
 type CascadeConfig struct {
@@ -44,31 +48,48 @@ type CascadeConfig struct {
 
 	// If this is true, then just run the "remove" parts of the queries, instead of the remove + add
 	RemoveOnly bool
+
+	// If this is provided, use this field instead of _id for determining "sameness". This must also be a bson.ObjectId field
+	ReferenceQuery []*ReferenceField
+
+	// If you want to filter the data right before it's cascaded to related documents, use this.
+	Filters []CascadeFilter
 }
+
+type CascadeFilter func(data map[string]interface{})
 
 // Cascades a document's properties to related documents, after it has been prepared
 // for db insertion (encrypted, etc)
-func CascadeSave(collection *Collection, doc interface{}, preparedForSave map[string]interface{}) {
+func CascadeSave(collection *Collection, doc interface{}, preparedForSave map[string]interface{}) error {
 	// Find out which properties to cascade
 	if conv, ok := doc.(interface {
 		GetCascade(*Collection) []*CascadeConfig
 	}); ok {
 		toCascade := conv.GetCascade(collection)
-
 		for _, conf := range toCascade {
-			cascadeSaveWithConfig(conf, preparedForSave)
 
+			if len(conf.ReferenceQuery) == 0 {
+				conf.ReferenceQuery = []*ReferenceField{&ReferenceField{"_id", preparedForSave["_id"]}}
+			}
+			_, err := cascadeSaveWithConfig(conf, preparedForSave)
+			if err != nil {
+				return err
+			}
 			if conf.Nest {
 				results := conf.Collection.Find(conf.Query)
 
 				for results.Next(conf.Instance) {
 					prepared := conf.Collection.PrepDocumentForSave(conf.Instance)
-					CascadeSave(conf.Collection, conf.Instance, prepared)
+					err = CascadeSave(conf.Collection, conf.Instance, prepared)
+					if err != nil {
+						return err
+					}
 				}
 
 			}
 		}
 	}
+	return nil
 }
 
 // Deletes references to a document from its related documents
@@ -80,24 +101,26 @@ func CascadeDelete(collection *Collection, doc interface{}) {
 		toCascade := conv.GetCascade(collection)
 
 		// Get the ID
-		id, err := reflections.GetField(doc, "Id")
 
-		if err != nil {
-			panic(err)
-		}
-
-		// Cast as bson.ObjectId
-		if bsonId, ok := id.(bson.ObjectId); ok {
-			for _, conf := range toCascade {
-				cascadeDeleteWithConfig(conf, bsonId)
+		for _, conf := range toCascade {
+			if len(conf.ReferenceQuery) == 0 {
+				id, err := reflections.GetField(doc, "Id")
+				if err != nil {
+					panic(err)
+				}
+				conf.ReferenceQuery = []*ReferenceField{&ReferenceField{"_id", id}}
 			}
+
+			cascadeDeleteWithConfig(conf)
+
 		}
 
 	}
 }
 
 // Runs a cascaded delete operation with one configuration
-func cascadeDeleteWithConfig(conf *CascadeConfig, id bson.ObjectId) (*mgo.ChangeInfo, error) {
+func cascadeDeleteWithConfig(conf *CascadeConfig) (*mgo.ChangeInfo, error) {
+
 	switch conf.RelType {
 	case REL_ONE:
 		update := map[string]map[string]interface{}{
@@ -118,9 +141,11 @@ func cascadeDeleteWithConfig(conf *CascadeConfig, id bson.ObjectId) (*mgo.Change
 			"$pull": map[string]interface{}{},
 		}
 
-		update["$pull"][conf.ThroughProp] = bson.M{
-			"_id": id,
+		q := bson.M{}
+		for _, f := range conf.ReferenceQuery {
+			q[f.BsonName] = f.Value
 		}
+		update["$pull"][conf.ThroughProp] = q
 		return conf.Collection.Collection().UpdateAll(conf.Query, update)
 	}
 
@@ -131,13 +156,7 @@ func cascadeDeleteWithConfig(conf *CascadeConfig, id bson.ObjectId) (*mgo.Change
 func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]interface{}) (*mgo.ChangeInfo, error) {
 	// Create a new map with just the props to cascade
 
-	id := preparedForSave["_id"]
-
 	data := make(map[string]interface{})
-	// Set the id field automatically if there's a through prop
-	if len(conf.ThroughProp) > 0 {
-		data["_id"] = id
-	}
 
 	for _, prop := range conf.Properties {
 		split := strings.Split(prop, ".")
@@ -167,9 +186,20 @@ func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]inter
 				}
 			}
 
-			curData[actualProp], _ = dotaccess.Get(preparedForSave, prop)
+			val, _ := dotaccess.Get(preparedForSave, prop)
+			if bsonId, ok := val.(bson.ObjectId); ok {
+				if !bsonId.Valid() {
+					curData[actualProp] = ""
+					continue
+				}
+			}
+			curData[actualProp] = val
 		}
 
+	}
+
+	for _, f := range conf.Filters {
+		f(data)
 	}
 
 	switch conf.RelType {
@@ -210,13 +240,16 @@ func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]inter
 		// Just update
 		return conf.Collection.Collection().UpdateAll(conf.Query, update)
 	case REL_MANY:
+
 		update1 := map[string]map[string]interface{}{
 			"$pull": map[string]interface{}{},
 		}
 
-		update1["$pull"][conf.ThroughProp] = bson.M{
-			"_id": id,
+		q := bson.M{}
+		for _, f := range conf.ReferenceQuery {
+			q[f.BsonName] = f.Value
 		}
+		update1["$pull"][conf.ThroughProp] = q
 
 		if len(conf.OldQuery) > 0 {
 			ret, err := conf.Collection.Collection().UpdateAll(conf.OldQuery, update1)
@@ -233,6 +266,7 @@ func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]inter
 		}
 
 		update2["$push"][conf.ThroughProp] = data
+
 		return conf.Collection.Collection().UpdateAll(conf.Query, update2)
 
 	}

@@ -1,8 +1,6 @@
 // Two-way encryption
 // @author Jason Raede <jason@maxwellhealth.com>
 
-// EncryptAndSave - 123850
-// EncryptInitializeDocumentFromDB - 102750
 package bongo
 
 import (

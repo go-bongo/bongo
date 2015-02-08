@@ -36,6 +36,15 @@ func (c *Collection) PrepDocumentForSave(doc interface{}) map[string]interface{}
 			bsonName = strings.Join([]string{strings.ToLower(left), rest}, "")
 		}
 
+		// Check if it's bson inline
+		inline := false
+		for _, t := range bsons {
+			if t == "inline" {
+				inline = true
+				break
+			}
+		}
+
 		tag, _ := reflections.GetFieldTag(doc, fieldName, "bongo")
 		bongoTags := getBongoTags(tag)
 		val, _ := reflections.GetField(doc, fieldName)
@@ -53,7 +62,15 @@ func (c *Collection) PrepDocumentForSave(doc interface{}) map[string]interface{}
 
 				// Recurse only if not nil
 				if t.Kind() == reflect.Struct || !rval.IsNil() {
-					returnMap[bsonName] = c.PrepDocumentForSave(val)
+					rec := c.PrepDocumentForSave(val)
+					if inline {
+						for k, v := range rec {
+							returnMap[k] = v
+						}
+					} else {
+						returnMap[bsonName] = c.PrepDocumentForSave(val)
+					}
+
 				}
 			} else if t.String() == "bson.ObjectId" {
 				// We won't catch "omitempty"
