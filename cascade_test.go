@@ -54,7 +54,7 @@ func (c *Child) GetCascade(collection *Collection) []*CascadeConfig {
 
 	cascadeMulti := &CascadeConfig{
 		Collection:  connection.Collection("parents"),
-		Properties:  []string{"name", "subChild.foo", "subChild._id"},
+		Properties:  []string{"_id", "name", "subChild.foo", "subChild._id"},
 		ThroughProp: "children",
 		RelType:     REL_MANY,
 		Query: bson.M{
