@@ -38,6 +38,10 @@ func (r *ResultSet) Next(mod interface{}) bool {
 		}); ok {
 			hook.AfterFind(r.Collection)
 		}
+
+		if newt, ok := mod.(NewTracker); ok {
+			newt.SetIsNew(false)
+		}
 		return true
 	}
 

@@ -38,7 +38,13 @@ func (c *DiffTracker) Modified(field string) bool {
 	if isNew {
 		return true
 	} else {
-		return stringInSlice(field, diffs)
+
+		for _, d := range diffs {
+			if d == field || strings.HasPrefix(d, field+".") {
+				return true
+			}
+		}
+		return false
 	}
 }
 

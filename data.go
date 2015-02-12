@@ -49,9 +49,15 @@ func (c *Collection) PrepDocumentForSave(doc interface{}) map[string]interface{}
 		bongoTags := getBongoTags(tag)
 		val, _ := reflections.GetField(doc, fieldName)
 
-		// Skip if it's populated via cascade
 		if len(bongoTags.cascadedFrom) > 0 {
-			continue
+			// Skip if it's populated via cascade, but only if it was changed
+			if trackable, ok := doc.(Trackable); ok {
+				if trackable.GetDiffTracker().Modified(fieldName) {
+					continue
+				}
+			} else {
+				continue
+			}
 		}
 
 		t := reflect.TypeOf(val)

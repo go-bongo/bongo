@@ -3,6 +3,7 @@ package bongo
 import (
 	"errors"
 	// "fmt"
+
 	"github.com/maxwellhealth/mgo"
 	"github.com/maxwellhealth/mgo/bson"
 	"github.com/oleiade/reflections"
@@ -15,6 +16,11 @@ import (
 type Collection struct {
 	Name       string
 	Connection *Connection
+}
+
+type NewTracker interface {
+	SetIsNew(bool)
+	IsNew() bool
 }
 
 type DocumentNotFoundError struct{}
@@ -55,18 +61,6 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 
 	isNew := false
 
-	if !id.Valid() {
-		id = bson.NewObjectId()
-		err := reflections.SetField(mod, "Id", id)
-
-		if err != nil {
-			panic(err)
-		}
-
-		isNew = true
-
-	}
-
 	// Validate?
 	if validator, ok := mod.(interface {
 		Validate(*Collection) []string
@@ -78,6 +72,31 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 			err.ValidationErrors = errs
 			return err
 		}
+	}
+
+	// If the model implements the NewTracker interface, we'll use that to determine newness rather than the validity of the ID field. This is still OK, but say you set the ID before saving, that will mean it'll think it's not new and could cause you some problems.
+
+	if newt, ok := mod.(NewTracker); ok {
+		isNew = newt.IsNew()
+
+		if !id.Valid() {
+			id = bson.NewObjectId()
+			err := reflections.SetField(mod, "Id", id)
+
+			if err != nil {
+				panic(err)
+			}
+		}
+	} else if !id.Valid() {
+		id = bson.NewObjectId()
+		err := reflections.SetField(mod, "Id", id)
+
+		if err != nil {
+			panic(err)
+		}
+
+		isNew = true
+
 	}
 
 	if isNew {
@@ -164,6 +183,9 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 	// 	tracker.Reset()
 	// }
 
+	if newt, ok := mod.(NewTracker); ok {
+		newt.SetIsNew(false)
+	}
 	return NewSaveResult(true, nil)
 }
 
@@ -171,13 +193,21 @@ func (c *Collection) FindById(id bson.ObjectId, mod interface{}) error {
 
 	err := c.Collection().FindId(id).One(mod)
 	if err != nil {
-		return err
+		if err.Error() == "not found" {
+			return &DocumentNotFoundError{}
+		} else {
+			return err
+		}
 	}
 
 	if hook, ok := mod.(interface {
 		AfterFind(*Collection)
 	}); ok {
 		hook.AfterFind(c)
+	}
+
+	if newt, ok := mod.(NewTracker); ok {
+		newt.SetIsNew(false)
 	}
 	return nil
 }
@@ -205,8 +235,14 @@ func (c *Collection) FindOne(query interface{}, mod interface{}) error {
 	if !hasNext {
 		if results.Error != nil {
 			return results.Error
+		} else {
+			return &DocumentNotFoundError{}
 		}
-		return &DocumentNotFoundError{}
+
+	}
+
+	if newt, ok := mod.(NewTracker); ok {
+		newt.SetIsNew(false)
 	}
 
 	return nil
