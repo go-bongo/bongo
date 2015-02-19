@@ -80,7 +80,7 @@ func (s *TestSuite) TestFindNonExistent(c *C) {
 
 	err := connection.FindById(bson.NewObjectId(), newMessage)
 
-	c.Assert(err.Error(), Equals, "not found")
+	c.Assert(err.Error(), Equals, "Document not found")
 }
 
 func (s *TestSuite) TestDelete(c *C) {
@@ -98,7 +98,7 @@ func (s *TestSuite) TestDelete(c *C) {
 
 	newMessage := new(FooBar)
 	err := connection.FindById(message.Id, newMessage)
-	c.Assert(err.Error(), Equals, "not found")
+	c.Assert(err.Error(), Equals, "Document not found")
 	// Make sure the ids are the same
 	//
 
