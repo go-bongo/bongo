@@ -2,7 +2,7 @@ package bongo
 
 import (
 	"errors"
-	"github.com/maxwellhealth/dotaccess"
+	"github.com/maxwellhealth/go-dotaccess"
 	"github.com/maxwellhealth/mgo"
 	"github.com/maxwellhealth/mgo/bson"
 	"github.com/oleiade/reflections"
