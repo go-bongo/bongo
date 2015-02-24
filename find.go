@@ -2,9 +2,7 @@ package bongo
 
 import (
 	"github.com/maxwellhealth/mgo"
-	"log"
 	"math"
-	"time"
 )
 
 type ResultSet struct {
@@ -68,10 +66,7 @@ func (r *ResultSet) Free() error {
 
 // Set skip + limit on the current query and generates a PaginationInfo struct with info for your front end
 func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
-	start := time.Now()
-	elapsed := time.Since(start)
 
-	log.Printf("Line 74: %s", elapsed)
 	info := new(PaginationInfo)
 
 	// Get count of current query
@@ -80,19 +75,12 @@ func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 	sess := r.Collection.Connection.Session.Copy()
 	defer sess.Close()
 
-	elapsed = time.Since(start)
-
-	log.Printf("Line 85: %s", elapsed)
 	count, err := sess.DB(r.Collection.Connection.Config.Database).C(r.Collection.Name).Find(r.Params).Count()
 	// count, err := r.Collection.Collection().Count()
 
 	if err != nil {
 		return info, err
 	}
-
-	elapsed = time.Since(start)
-
-	log.Printf("Line 95: %s", elapsed)
 
 	// Calculate how many pages
 	totalPages := int(math.Ceil(float64(count) / float64(perPage)))
@@ -102,10 +90,6 @@ func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 	} else if page > totalPages {
 		page = totalPages
 	}
-
-	elapsed = time.Since(start)
-
-	log.Printf("Line 108: %s", elapsed)
 
 	skip := (page - 1) * perPage
 
@@ -127,10 +111,6 @@ func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 		}
 
 	}
-
-	elapsed = time.Since(start)
-
-	log.Printf("Line 133: %s", elapsed)
 
 	return info, nil
 }
