@@ -233,6 +233,7 @@ func (c *Collection) Find(query interface{}) *ResultSet {
 	resultset := new(ResultSet)
 
 	resultset.Query = q
+	resultset.Params = query
 	resultset.Collection = c
 
 	return resultset

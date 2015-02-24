@@ -11,6 +11,7 @@ type ResultSet struct {
 	loadedIter bool
 	Collection *Collection
 	Error      error
+	Params     interface{}
 }
 
 type PaginationInfo struct {
@@ -68,13 +69,14 @@ func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 
 	info := new(PaginationInfo)
 
+	return info, nil
 	// Get count of current query
 	// count, err := r.Query.Count()
 
 	sess := r.Collection.Connection.Session.Clone()
 	defer sess.Close()
 
-	count, err := sess.DB(r.Collection.Connection.Config.Database).C(r.Collection.Name).Count()
+	count, err := sess.DB(r.Collection.Connection.Config.Database).C(r.Collection.Name).Find(r.Params).Count()
 	// count, err := r.Collection.Collection().Count()
 
 	if err != nil {
