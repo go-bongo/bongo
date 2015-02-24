@@ -73,6 +73,7 @@ func (s *TestSuite) SetUpTest(c *C) {
 	}
 
 }
-func (s *TestSuite) TearDownSuite(c *C) {
-	connection.Session.Close()
-}
+
+// func (s *TestSuite) TearDownSuite(c *C) {
+// 	connection.Session.Close()
+// }

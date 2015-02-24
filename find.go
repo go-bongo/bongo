@@ -2,9 +2,7 @@ package bongo
 
 import (
 	"github.com/maxwellhealth/mgo"
-	"log"
 	"math"
-	"time"
 )
 
 type ResultSet struct {
@@ -68,9 +66,6 @@ func (r *ResultSet) Free() error {
 // Set skip + limit on the current query and generates a PaginationInfo struct with info for your front end
 func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 
-	start := time.Now()
-	elapsed := time.Since(start)
-	log.Printf("Time at 74: %s\n", elapsed)
 	info := new(PaginationInfo)
 
 	// Get count of current query
@@ -86,9 +81,6 @@ func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 		return info, err
 	}
 
-	elapsed = time.Since(start)
-	log.Printf("Time at 85: %s\n", elapsed)
-
 	// Calculate how many pages
 	totalPages := int(math.Ceil(float64(count) / float64(perPage)))
 
@@ -97,9 +89,6 @@ func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 	} else if page > totalPages {
 		page = totalPages
 	}
-
-	elapsed = time.Since(start)
-	log.Printf("Time at 96: %s\n", elapsed)
 
 	skip := (page - 1) * perPage
 
@@ -121,8 +110,6 @@ func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 		}
 
 	}
-	elapsed = time.Since(start)
-	log.Printf("Time at 120: %s\n", elapsed)
 
 	return info, nil
 }

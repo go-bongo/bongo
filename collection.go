@@ -33,7 +33,15 @@ func (c *Collection) Collection() *mgo.Collection {
 	return c.Connection.Session.DB(c.Connection.Config.Database).C(c.Name)
 }
 
+func (c *Collection) collectionOnSession(sess *mgo.Session) *mgo.Collection {
+	return sess.DB(c.Connection.Config.Database).C(c.Name)
+}
+
 func (c *Collection) Save(mod interface{}) (result *SaveResult) {
+	sess := c.Connection.Session.Clone()
+	defer sess.Close()
+
+	col := c.collectionOnSession(sess)
 	// defer func() {
 
 	// 	if r := recover(); r != nil {
@@ -152,7 +160,7 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 	}
 
 	// 5) Save (upsert)
-	_, err = c.Collection().UpsertId(id, modelMap)
+	_, err = col.UpsertId(id, modelMap)
 
 	if err != nil {
 		panic(err)
@@ -214,9 +222,13 @@ func (c *Collection) FindById(id bson.ObjectId, mod interface{}) error {
 
 // Pass in the sample just so we can get the collection name
 func (c *Collection) Find(query interface{}) *ResultSet {
+	sess := c.Connection.Session.Clone()
+	// defer sess.Close()
+
+	col := c.collectionOnSession(sess)
 
 	// Count for testing
-	q := c.Collection().Find(query)
+	q := col.Find(query)
 
 	resultset := new(ResultSet)
 
@@ -227,6 +239,7 @@ func (c *Collection) Find(query interface{}) *ResultSet {
 }
 
 func (c *Collection) FindOne(query interface{}, mod interface{}) error {
+
 	// Now run a find
 	results := c.Find(query)
 
@@ -249,6 +262,11 @@ func (c *Collection) FindOne(query interface{}, mod interface{}) error {
 }
 
 func (c *Collection) Delete(mod interface{}) error {
+	sess := c.Connection.Session.Clone()
+	defer sess.Close()
+
+	col := c.collectionOnSession(sess)
+
 	ensureIdField(mod)
 	f, err := reflections.GetField(mod, "Id")
 	if err != nil {
@@ -261,7 +279,7 @@ func (c *Collection) Delete(mod interface{}) error {
 		hook.BeforeDelete(c)
 	}
 
-	err = c.Collection().Remove(bson.M{"_id": id})
+	err = col.Remove(bson.M{"_id": id})
 
 	if err != nil {
 		return err
