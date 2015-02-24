@@ -77,7 +77,7 @@ func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 	// Get count of current query
 	// count, err := r.Query.Count()
 
-	sess := r.Collection.Connection.Session.Clone()
+	sess := r.Collection.Connection.Session.Copy()
 	defer sess.Close()
 
 	elapsed = time.Since(start)
