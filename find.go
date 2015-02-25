@@ -25,24 +25,24 @@ type PaginationInfo struct {
 func (r *ResultSet) Next(mod interface{}) bool {
 
 	// Check if the iter has been instantiated yet
-	if !r.loadedIter {
-		r.Iter = r.Query.Iter()
-		r.loadedIter = true
-	}
+	// if !r.loadedIter {
+	// 	r.Iter = r.Query.Iter()
+	// 	r.loadedIter = true
+	// }
 
 	gotResult := r.Iter.Next(mod)
 
 	if gotResult {
 
-		if hook, ok := mod.(interface {
-			AfterFind(*Collection)
-		}); ok {
-			hook.AfterFind(r.Collection)
-		}
+		// if hook, ok := mod.(interface {
+		// 	AfterFind(*Collection)
+		// }); ok {
+		// 	hook.AfterFind(r.Collection)
+		// }
 
-		if newt, ok := mod.(NewTracker); ok {
-			newt.SetIsNew(false)
-		}
+		// if newt, ok := mod.(NewTracker); ok {
+		// 	newt.SetIsNew(false)
+		// }
 		return true
 	}
 
@@ -73,9 +73,9 @@ func (r *ResultSet) Paginate(perPage, page int) (*PaginationInfo, error) {
 	// count, err := r.Query.Count()
 
 	sess := r.Collection.Connection.Session.Copy()
-	defer sess.Close()
 
 	count, err := sess.DB(r.Collection.Connection.Config.Database).C(r.Collection.Name).Find(r.Params).Count()
+	sess.Close()
 	// count, err := r.Collection.Collection().Count()
 
 	if err != nil {

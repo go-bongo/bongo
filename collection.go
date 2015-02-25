@@ -222,7 +222,7 @@ func (c *Collection) FindById(id bson.ObjectId, mod interface{}) error {
 
 // Pass in the sample just so we can get the collection name
 func (c *Collection) Find(query interface{}) *ResultSet {
-	sess := c.Connection.Session.Clone()
+	sess := c.Connection.Session.Copy()
 	// defer sess.Close()
 
 	col := c.collectionOnSession(sess)

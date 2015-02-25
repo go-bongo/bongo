@@ -1,9 +1,11 @@
 package bongo
 
 import (
+	"fmt"
 	"github.com/maxwellhealth/mgo/bson"
 	. "gopkg.in/check.v1"
 	"log"
+	"time"
 	// "testing"
 )
 
@@ -257,6 +259,103 @@ func (s *TestSuite) TestRecursiveSaveWithEncryption(c *C) {
 // Just to make sure the benchmark will work...
 func (s *TestSuite) TestBenchmarkEncryptAndSave(c *C) {
 	createAndSaveDocument()
+}
+
+func runFindWithBongo(ch chan<- int64) {
+
+	start := time.Now()
+	// results := connection.Collection("foobars").Collection().Find(nil)
+
+	// count, _ := results.Count()
+
+	results := connection.Collection("foobars").Find(nil)
+
+	results.Iter = results.Query.Iter()
+	// results.Paginate(50, 1)
+	// iter := results.Iter()
+	for i := 0; i < 50; i++ {
+		t := &FooBar{}
+		results.Next(t)
+	}
+	// for i := 0; i < info.RecordsOnPage; i++ {
+	// 	t := &FooBar{}
+	// 	results.Next(t)
+	// }
+	elapsed := time.Since(start)
+
+	ch <- elapsed.Nanoseconds()
+
+}
+
+func runFindWithMgo(ch chan<- int64) {
+
+	start := time.Now()
+	results := connection.Collection("foobars").Collection().Find(nil)
+
+	results.Count()
+
+	// results.Paginate(50, 1)
+	iter := results.Iter()
+	for i := 0; i < 50; i++ {
+		t := &FooBar{}
+		iter.Next(t)
+	}
+	// for i := 0; i < info.RecordsOnPage; i++ {
+	// 	t := &FooBar{}
+	// 	results.Next(t)
+	// }
+	elapsed := time.Since(start)
+
+	ch <- elapsed.Nanoseconds()
+
+}
+
+func testConcurrentFinds(n int) int {
+	ch := make(chan int64)
+	for i := 0; i < n; i++ {
+		go runFindWithMgo(ch)
+	}
+
+	els := 0
+	got := 0
+
+loop:
+	for {
+		select {
+		case elapsed := <-ch:
+			els += int(elapsed)
+			got++
+
+			if got == n {
+				break loop
+			}
+		default:
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
+	return els / n
+}
+
+func (s *TestSuite) TestConcurrentFinds(c *C) {
+	for i := 0; i < 50; i++ {
+		// Create 50 tests
+		test := &FooBar{
+			Msg: "test",
+		}
+		res := connection.Collection("foobars").Save(test)
+		c.Assert(res.Success, Equals, true)
+	}
+
+	nums := []int{1, 5, 10, 20, 50, 100, 200}
+
+	for _, n := range nums {
+		tot := 0
+		for i := 0; i < 10; i++ {
+			tot += testConcurrentFinds(n)
+		}
+		fmt.Println(n, " concurrent finds :: ", ((tot / 10) / 1e6), "ms/req")
+	}
 }
 
 /////////////////////
