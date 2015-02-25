@@ -270,8 +270,8 @@ func runFindWithBongo(ch chan<- int64) {
 
 	results := connection.Collection("foobars").Find(nil)
 
-	results.Iter = results.Query.Iter()
-	// results.Paginate(50, 1)
+	// results.Iter = results.Query.Iter()
+	results.Paginate(50, 1)
 	// iter := results.Iter()
 	for i := 0; i < 50; i++ {
 		t := &FooBar{}
@@ -313,7 +313,7 @@ func runFindWithMgo(ch chan<- int64) {
 func testConcurrentFinds(n int) int {
 	ch := make(chan int64)
 	for i := 0; i < n; i++ {
-		go runFindWithMgo(ch)
+		go runFindWithBongo(ch)
 	}
 
 	els := 0
