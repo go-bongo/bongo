@@ -289,12 +289,18 @@ func runFindWithBongo(ch chan<- int64) {
 
 func runFindWithMgo(ch chan<- int64) {
 
+	// sess := connection.Session.Copy()
+	// defer sess.Close()
+	sess := connection.Session
 	start := time.Now()
-	results := connection.Collection("foobars").Collection().Find(nil)
+	results := sess.DB(connection.Config.Database).C("foobars").Find(nil)
+	// connection.Collection("foobars").Collection().Find(nil)
 
 	results.Count()
 
 	// results.Paginate(50, 1)
+
+	// arr := make([]*FooBar, 50)
 	iter := results.Iter()
 	for i := 0; i < 50; i++ {
 		t := &FooBar{}
@@ -313,7 +319,7 @@ func runFindWithMgo(ch chan<- int64) {
 func testConcurrentFinds(n int) int {
 	ch := make(chan int64)
 	for i := 0; i < n; i++ {
-		go runFindWithBongo(ch)
+		go runFindWithMgo(ch)
 	}
 
 	els := 0

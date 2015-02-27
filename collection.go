@@ -147,9 +147,16 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 		hook.BeforeSaveMap(c, modelMap)
 	}
 
-	// Add created/modified time
+	// Add created/modified time. Also set on the model itself if it has those fields.
+	now := time.Now()
 	if isNew {
-		modelMap["_created"] = time.Now()
+		if has, _ := reflections.HasField(mod, "Created"); has {
+			reflections.SetField(mod, "Created", now)
+		}
+		modelMap["_created"] = now
+	}
+	if has, _ := reflections.HasField(mod, "Modified"); has {
+		reflections.SetField(mod, "Modified", now)
 	}
 	modelMap["_modified"] = time.Now()
 
@@ -222,9 +229,9 @@ func (c *Collection) FindById(id bson.ObjectId, mod interface{}) error {
 
 // Pass in the sample just so we can get the collection name
 func (c *Collection) Find(query interface{}) *ResultSet {
-	// sess := c.Connection.Session.Copy()
 	// defer sess.Close()
 
+	// col := c.Collection()
 	col := c.Collection()
 
 	// Count for testing
