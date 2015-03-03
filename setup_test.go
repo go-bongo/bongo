@@ -1,6 +1,7 @@
 package bongo
 
 import (
+	"crypto/rand"
 	"github.com/maxwellhealth/mgo/bson"
 	. "gopkg.in/check.v1"
 	"log"
@@ -18,7 +19,7 @@ type NullWriter int
 
 func (NullWriter) Write([]byte) (int, error) { return 0, nil }
 
-var key = []byte("asdf1234asdf1234")
+var key [32]byte
 
 type Nested struct {
 	Foo     string
@@ -66,7 +67,9 @@ var config = &Config{
 var connection, _ = Connect(config)
 
 func (s *TestSuite) SetUpTest(c *C) {
-	EncryptionKey = []byte("asdf1234asdf1234")
+	EnableEncryption = true
+	rand.Reader.Read(key[:])
+	EncryptionKey = key
 	connection.Session.DB(config.Database).DropDatabase()
 	if !testing.Verbose() {
 		log.SetOutput(new(NullWriter))

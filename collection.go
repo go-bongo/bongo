@@ -149,6 +149,7 @@ func (c *Collection) Save(mod interface{}) (result *SaveResult) {
 
 	// Add created/modified time. Also set on the model itself if it has those fields.
 	now := time.Now()
+
 	if isNew {
 		if has, _ := reflections.HasField(mod, "Created"); has {
 			reflections.SetField(mod, "Created", now)

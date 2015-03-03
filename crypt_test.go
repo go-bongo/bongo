@@ -20,6 +20,7 @@ type EncryptedStruct struct {
 }
 
 func (s *TestSuite) TestRawCryptDecrypt(c *C) {
+
 	val := "my string"
 
 	encrypted, err := Encrypt(key, []byte(val))
@@ -66,7 +67,7 @@ func (s *TestSuite) TestEncryptedTypes(c *C) {
 }
 
 func (s *TestSuite) TestEncryptedTypesWithNoEncryption(c *C) {
-	EncryptionKey = []byte{}
+	EncryptionKey = [32]byte{}
 	date := time.Now()
 	myStruct := &EncryptedStruct{true, "foo", 5.555, 6, EncryptedDate(date.Format(iso8601Format)), EncryptedMap(make(map[string]interface{}))}
 
@@ -86,4 +87,13 @@ func (s *TestSuite) TestEncryptedTypesWithNoEncryption(c *C) {
 	// BSON loses some nanosecond precision on raw marshal/unmarshal
 	t, _ := newStruct.Date.GetTime()
 	c.Assert(t.Format(time.RFC1123Z), Equals, date.Format(time.RFC1123Z))
+}
+
+func (s *TestSuite) BenchmarkEncryptDecrypt(c *C) {
+
+	for i := 0; i < c.N; i++ {
+		encrypted, _ := Encrypt(EncryptionKey, []byte("this is a test"))
+		decrypted, _ := Decrypt(EncryptionKey, encrypted)
+		c.Assert(string(decrypted), Equals, "this is a test")
+	}
 }

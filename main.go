@@ -19,7 +19,8 @@ type Config struct {
 	Database         string
 }
 
-var EncryptionKey = []byte{}
+var EncryptionKey [32]byte
+var EnableEncryption bool
 
 type SaveResult struct {
 	Success          bool
