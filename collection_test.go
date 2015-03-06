@@ -1,388 +1,227 @@
 package bongo
 
 import (
-	"fmt"
-	"github.com/maxwellhealth/mgo/bson"
-	. "gopkg.in/check.v1"
-	"log"
-	"time"
-	// "testing"
+	. "github.com/smartystreets/goconvey/convey"
+	"labix.org/v2/mgo/bson"
+	"testing"
 )
 
-func (s *TestSuite) TestSaveAndFindWithHooks(c *C) {
-
-	// This needs to always be a pointer, otherwise the encryption component won't like it.
-	message := new(FooBar)
-	message.Msg = "Foo"
-	message.Count = 5
-
-	result := connection.Save(message)
-
-	c.Assert(result.Success, Equals, true)
-
-	newMessage := new(FooBar)
-
-	connection.FindById(message.Id, newMessage)
-
-	// Make sure the ids are the same
-	c.Assert(newMessage.Id.String(), Equals, message.Id.String())
-	c.Assert(newMessage.Msg, Equals, message.Msg)
-
-	// Testing the hook here - it should have run and +1 on BeforeSave and +1 on BeforeCreate and +5 on AfterFind
-	c.Assert(newMessage.Count, Equals, 12)
-
-	// Saving it again should run +1 on BeforeSave and +2 on BeforeUpdate
-	result = connection.Save(message)
-
-	c.Assert(result.Success, Equals, true)
-	c.Assert(message.Count, Equals, 10)
-
-	connection.Session.DB(config.Database).DropDatabase()
+type noHookDocument struct {
+	DocumentBase `bson:",inline"`
+	Name         string
 }
 
-func (s *TestSuite) TestSaveAndFindWithChild(c *C) {
-
-	// This needs to always be a pointer, otherwise the encryption component won't like it.
-	message := new(FooBar)
-	message.Msg = "Foo"
-	message.Count = 5
-	message.Child = &Nested{
-		Foo:     "foo",
-		BazBing: "bar",
-	}
-	result := connection.Save(message)
-
-	c.Assert(result.Success, Equals, true)
-
-	newMessage := new(FooBar)
-
-	connection.FindById(message.Id, newMessage)
-
-	c.Assert(newMessage.Child.BazBing, Equals, "bar")
-	c.Assert(newMessage.Child.Foo, Equals, "foo")
-
+type hookedDocument struct {
+	DocumentBase    `bson:",inline"`
+	RanBeforeSave   bool
+	RanAfterSave    bool
+	RanBeforeDelete bool
+	RanAfterDelete  bool
+	RanAfterFind    bool
 }
 
-func (s *TestSuite) TestValidationFailure(c *C) {
-
-	message := new(FooBar)
-	message.Msg = "Foo"
-	message.Count = 3
-
-	result := connection.Save(message)
-
-	c.Assert(result.Err.Error(), Equals, "Validation failed")
-	c.Assert(result.ValidationErrors[0], Equals, "count cannot be 3")
-
+func (h *hookedDocument) BeforeSave(c *Collection) error {
+	h.RanBeforeSave = true
+	return nil
 }
 
-func (s *TestSuite) TestFindNonExistent(c *C) {
-
-	newMessage := new(FooBar)
-
-	err := connection.FindById(bson.NewObjectId(), newMessage)
-
-	c.Assert(err.Error(), Equals, "Document not found")
+func (h *hookedDocument) AfterSave(c *Collection) error {
+	h.RanAfterSave = true
+	return nil
 }
 
-func (s *TestSuite) TestDelete(c *C) {
-
-	// This needs to always be a pointer, otherwise the encryption component won't like it.
-	message := new(FooBar)
-	message.Msg = "Foo"
-	message.Count = 5
-
-	result := connection.Save(message)
-
-	c.Assert(result.Success, Equals, true)
-
-	connection.Delete(message)
-
-	newMessage := new(FooBar)
-	err := connection.FindById(message.Id, newMessage)
-	c.Assert(err.Error(), Equals, "Document not found")
-	// Make sure the ids are the same
-	//
-
+func (h *hookedDocument) BeforeDelete(c *Collection) error {
+	h.RanBeforeDelete = true
+	return nil
 }
 
-func (s *TestSuite) TestFindOne(c *C) {
-
-	// This needs to always be a pointer, otherwise the encryption component won't like it.
-	message := new(FooBar)
-	message.Msg = "Foo"
-	message.Count = 5
-
-	res := connection.Save(message)
-
-	c.Assert(res.Success, Equals, true)
-
-	result := &FooBar{}
-
-	query := bson.M{
-		"count": 7,
-	}
-
-	err := connection.FindOne(query, result)
-
-	c.Assert(err, Equals, nil)
-
-	c.Assert(string(result.Msg), Equals, "Foo")
-	// After find adds 5
-	c.Assert(result.Count, Equals, 12)
-
+func (h *hookedDocument) AfterDelete(c *Collection) error {
+	h.RanAfterDelete = true
+	return nil
 }
 
-func (s *TestSuite) TestFind(c *C) {
-
-	// This needs to always be a pointer, otherwise the encryption component won't like it.
-	message := new(FooBar)
-	message.Msg = "Foo"
-	message.Count = 5
-
-	result := connection.Save(message)
-
-	c.Assert(result.Success, Equals, true)
-
-	message2 := new(FooBar)
-	message2.Msg = "Bar"
-	message2.Count = 10
-
-	result = connection.Save(message2)
-
-	c.Assert(result.Success, Equals, true)
-
-	// Now run a find
-	results := connection.Find(nil, &FooBar{})
-
-	res := new(FooBar)
-
-	count := 0
-
-	for results.Next(res) {
-		count++
-		if count == 1 {
-			c.Assert(string(res.Msg), Equals, "Foo")
-		} else {
-			c.Assert(string(res.Msg), Equals, "Bar")
-		}
-	}
-
-	c.Assert(count, Equals, 2)
-
+func (h *hookedDocument) AfterFind(c *Collection) error {
+	h.RanAfterFind = true
+	return nil
 }
 
-func (s *TestSuite) TestFindWithPagination(c *C) {
-
-	// This needs to always be a pointer, otherwise the encryption component won't like it.
-	message := new(FooBar)
-	message.Msg = "Foo"
-	message.Count = 5
-
-	result := connection.Save(message)
-
-	c.Assert(result.Success, Equals, true)
-
-	message2 := new(FooBar)
-	message2.Msg = "Bar"
-	message2.Count = 5
-
-	result = connection.Save(message2)
-
-	c.Assert(result.Success, Equals, true)
-
-	// Now run a find (hooks will add 2)
-	results := connection.Find(&bson.M{"count": 7}, &FooBar{})
-
-	results.Paginate(1, 1)
-	res := new(FooBar)
-
-	count := 0
-
-	for results.Next(res) {
-		count++
-		if count == 1 {
-			c.Assert(string(res.Msg), Equals, "Foo")
-		}
-	}
-
-	c.Assert(count, Equals, 1)
-	// hooks will add 2
-	resultsPage2 := connection.Find(&bson.M{"count": 7}, &FooBar{})
-
-	resultsPage2.Paginate(1, 2)
-
-	count2 := 0
-	for resultsPage2.Next(res) {
-		count2++
-		if count2 == 1 {
-			c.Assert(string(res.Msg), Equals, "Bar")
-		}
-	}
-
-	c.Assert(count2, Equals, 1)
-
+type validatedDocument struct {
+	DocumentBase `bson:",inline"`
+	Name         string
 }
 
-type RecursiveChild struct {
-	Bar EncryptedString `bson:"bar"`
-}
-type RecursiveParent struct {
-	Id    bson.ObjectId   `bson:"_id"`
-	Foo   EncryptedString `bson:"foo"`
-	Child *RecursiveChild `bson:"child"`
+func (v *validatedDocument) Validate(c *Collection) []string {
+	return []string{"test validation error"}
 }
 
-func (s *TestSuite) TestRecursiveSaveWithEncryption(c *C) {
-	parent := &RecursiveParent{
-		Foo: "foo",
-		Child: &RecursiveChild{
-			Bar: "bar",
-		},
-	}
+func TestCollection(t *testing.T) {
 
-	connection.Save(parent)
+	conn := getConnection()
+	defer conn.Session.Close()
 
-	// Fetch natively...
+	Convey("Saving", t, func() {
+		Convey("should be able to save a document with no hooks, update id, and use new tracker", func() {
 
-	newParent := &RecursiveParent{}
+			doc := &noHookDocument{}
+			doc.Name = "foo"
+			So(doc.IsNew(), ShouldEqual, true)
 
-	// Now fetch using bongo to decrypt...
-	connection.Collection("recursive_parent").FindById(parent.Id, newParent)
-	c.Assert(string(newParent.Child.Bar), Equals, "bar")
+			err := conn.Collection("tests").Save(doc)
+			So(err, ShouldEqual, nil)
+			So(doc.Id.Valid(), ShouldEqual, true)
+			So(doc.IsNew(), ShouldEqual, false)
+		})
 
-	connection.Collection("recursive_parent").Collection().FindId(parent.Id).One(newParent)
+		Convey("should be able to save a document with save hooks", func() {
+			doc := &hookedDocument{}
 
-	c.Assert(newParent.Child.Bar, Not(Equals), "bar")
-}
+			err := conn.Collection("tests").Save(doc)
 
-// Just to make sure the benchmark will work...
-func (s *TestSuite) TestBenchmarkEncryptAndSave(c *C) {
-	createAndSaveDocument()
-}
+			So(err, ShouldEqual, nil)
+			So(doc.RanBeforeSave, ShouldEqual, true)
+			So(doc.RanAfterSave, ShouldEqual, true)
+		})
 
-func runFindWithBongo(ch chan<- int64) {
+		Convey("should return a validation error if the validate method has things in the return value", func() {
+			doc := &validatedDocument{}
+			err := conn.Collection("tests").Save(doc)
 
-	start := time.Now()
-	// results := connection.Collection("foobars").Collection().Find(nil)
+			v, ok := err.(*ValidationError)
+			So(ok, ShouldEqual, true)
+			So(v.Errors[0], ShouldEqual, "test validation error")
+		})
 
-	// count, _ := results.Count()
+		Convey("should be able to save an existing document", func() {
+			doc := &noHookDocument{}
+			doc.Name = "foo"
+			So(doc.IsNew(), ShouldEqual, true)
 
-	results := connection.Collection("foobars").Find(nil)
+			err := conn.Collection("tests").Save(doc)
+			So(err, ShouldEqual, nil)
+			So(doc.Id.Valid(), ShouldEqual, true)
+			So(doc.IsNew(), ShouldEqual, false)
 
-	// results.Iter = results.Query.Iter()
-	results.Paginate(50, 1)
-	// iter := results.Iter()
-	for i := 0; i < 50; i++ {
-		t := &FooBar{}
-		results.Next(t)
-	}
-	// for i := 0; i < info.RecordsOnPage; i++ {
-	// 	t := &FooBar{}
-	// 	results.Next(t)
-	// }
-	elapsed := time.Since(start)
+			err = conn.Collection("tests").Save(doc)
 
-	ch <- elapsed.Nanoseconds()
+			So(err, ShouldEqual, nil)
+			count, err := conn.Collection("tests").Collection().Count()
+			So(err, ShouldEqual, nil)
+			So(count, ShouldEqual, 1)
+		})
 
-}
+		Convey("should set created and modified dates", func() {
 
-func runFindWithMgo(ch chan<- int64) {
+			doc := &noHookDocument{}
+			doc.Name = "foo"
 
-	// sess := connection.Session.Copy()
-	// defer sess.Close()
-	sess := connection.Session
-	start := time.Now()
-	results := sess.DB(connection.Config.Database).C("foobars").Find(nil)
-	// connection.Collection("foobars").Collection().Find(nil)
+			err := conn.Collection("tests").Save(doc)
+			So(err, ShouldEqual, nil)
+			So(doc.Created.UnixNano(), ShouldEqual, doc.Modified.UnixNano())
 
-	results.Count()
+			err = conn.Collection("tests").Save(doc)
+			So(err, ShouldEqual, nil)
+			So(doc.Modified.UnixNano(), ShouldBeGreaterThan, doc.Created.UnixNano())
+		})
 
-	// results.Paginate(50, 1)
+		Reset(func() {
+			conn.Session.DB("bongotest").DropDatabase()
+		})
+	})
 
-	// arr := make([]*FooBar, 50)
-	iter := results.Iter()
-	for i := 0; i < 50; i++ {
-		t := &FooBar{}
-		iter.Next(t)
-	}
-	// for i := 0; i < info.RecordsOnPage; i++ {
-	// 	t := &FooBar{}
-	// 	results.Next(t)
-	// }
-	elapsed := time.Since(start)
+	Convey("FindById", t, func() {
+		doc := &noHookDocument{}
+		err := conn.Collection("tests").Save(doc)
+		So(err, ShouldEqual, nil)
 
-	ch <- elapsed.Nanoseconds()
+		Convey("should find a doc by id", func() {
+			newDoc := &noHookDocument{}
+			err := conn.Collection("tests").FindById(doc.GetId(), newDoc)
+			So(err, ShouldEqual, nil)
+			So(newDoc.Id.Hex(), ShouldEqual, doc.Id.Hex())
+		})
 
-}
+		Convey("should find a doc by id and run afterFind", func() {
+			newDoc := &hookedDocument{}
+			err := conn.Collection("tests").FindById(doc.GetId(), newDoc)
+			So(err, ShouldEqual, nil)
+			So(newDoc.Id.Hex(), ShouldEqual, doc.Id.Hex())
+			So(newDoc.RanAfterFind, ShouldEqual, true)
+		})
 
-func testConcurrentFinds(n int) int {
-	ch := make(chan int64)
-	for i := 0; i < n; i++ {
-		go runFindWithMgo(ch)
-	}
+		Convey("should return a document not found error if doc not found", func() {
 
-	els := 0
-	got := 0
+			err := conn.Collection("tests").FindById(bson.NewObjectId(), doc)
+			_, ok := err.(*DocumentNotFoundError)
+			So(ok, ShouldEqual, true)
+		})
 
-loop:
-	for {
-		select {
-		case elapsed := <-ch:
-			els += int(elapsed)
-			got++
+		Reset(func() {
+			conn.Session.DB("bongotest").DropDatabase()
+		})
+	})
 
-			if got == n {
-				break loop
-			}
-		default:
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
+	Convey("FindOne", t, func() {
+		doc := &noHookDocument{}
+		doc.Name = "foo"
+		err := conn.Collection("tests").Save(doc)
+		So(err, ShouldEqual, nil)
 
-	return els / n
-}
+		Convey("should find one with query", func() {
+			newDoc := &noHookDocument{}
+			err := conn.Collection("tests").FindOne(bson.M{
+				"name": "foo",
+			}, newDoc)
+			So(err, ShouldEqual, nil)
+			So(newDoc.Id.Hex(), ShouldEqual, doc.Id.Hex())
+		})
 
-func (s *TestSuite) TestConcurrentFinds(c *C) {
-	for i := 0; i < 50; i++ {
-		// Create 50 tests
-		test := &FooBar{
-			Msg: "test",
-		}
-		res := connection.Collection("foobars").Save(test)
-		c.Assert(res.Success, Equals, true)
-	}
+		Convey("should find one with query and run afterFind", func() {
+			newDoc := &hookedDocument{}
+			err := conn.Collection("tests").FindOne(bson.M{
+				"name": "foo",
+			}, newDoc)
+			So(err, ShouldEqual, nil)
+			So(newDoc.Id.Hex(), ShouldEqual, doc.Id.Hex())
+			So(newDoc.RanAfterFind, ShouldEqual, true)
+		})
 
-	nums := []int{1, 5, 10, 20, 50, 100, 200}
+		Reset(func() {
+			conn.Session.DB("bongotest").DropDatabase()
+		})
+	})
 
-	for _, n := range nums {
-		tot := 0
-		for i := 0; i < 10; i++ {
-			tot += testConcurrentFinds(n)
-		}
-		fmt.Println(n, " concurrent finds :: ", ((tot / 10) / 1e6), "ms/req")
-	}
-}
+	Convey("Delete", t, func() {
+		Convey("should be able delete a document", func() {
+			doc := &noHookDocument{}
 
-/////////////////////
-/// BENCHMARKS
-/////////////////////
-func createAndSaveDocument() {
-	message := &FooBar{
-		Msg:   "Foo",
-		Count: 5,
-	}
+			err := conn.Collection("tests").Save(doc)
+			So(err, ShouldEqual, nil)
 
-	status := connection.Save(message)
-	// log.Println("status:", status.Success)
-	if status.Success != true {
-		log.Println(status.Error())
-		panic(status.Error)
-	}
-}
-func (s *TestSuite) BenchmarkEncryptAndSave(c *C) {
+			err = conn.Collection("tests").Delete(doc)
+			So(err, ShouldEqual, nil)
 
-	for i := 0; i < c.N; i++ {
-		createAndSaveDocument()
-	}
+			count, err := conn.Collection("tests").Collection().Count()
+
+			So(err, ShouldEqual, nil)
+			So(count, ShouldEqual, 0)
+		})
+
+		Convey("should be able delete a document and run hooks", func() {
+			doc := &hookedDocument{}
+
+			err := conn.Collection("tests").Save(doc)
+			So(err, ShouldEqual, nil)
+
+			err = conn.Collection("tests").Delete(doc)
+			So(err, ShouldEqual, nil)
+
+			count, err := conn.Collection("tests").Collection().Count()
+
+			So(err, ShouldEqual, nil)
+			So(count, ShouldEqual, 0)
+
+			So(doc.RanBeforeDelete, ShouldEqual, true)
+			So(doc.RanAfterDelete, ShouldEqual, true)
+		})
+	})
 }

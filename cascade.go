@@ -2,11 +2,9 @@ package bongo
 
 import (
 	"errors"
-	"github.com/maxwellhealth/go-dotaccess"
-	"github.com/maxwellhealth/mgo"
-	"github.com/maxwellhealth/mgo/bson"
 	"github.com/oleiade/reflections"
-	"strings"
+	"labix.org/v2/mgo"
+	"labix.org/v2/mgo/bson"
 )
 
 // Relation types (one-to-many or one-to-one)
@@ -40,38 +38,38 @@ type CascadeConfig struct {
 	// Should it also cascade the related doc on save?
 	Nest bool
 
-	// Data to cascade. Can be in dot notation
+	// If there is no through prop, we need to know which properties to nullify if a document is deleted
+	// and cascades to the root level of a related document. These are also used to nullify the previous relation
+	// if the relation ID is changed
 	Properties []string
 
+	// Full data to cascade down to the related document. Note
+	Data interface{}
+
 	// An instance of the related doc if it needs to be nested
-	Instance interface{}
+	Instance Document
 
 	// If this is true, then just run the "remove" parts of the queries, instead of the remove + add
 	RemoveOnly bool
 
 	// If this is provided, use this field instead of _id for determining "sameness". This must also be a bson.ObjectId field
 	ReferenceQuery []*ReferenceField
-
-	// If you want to filter the data right before it's cascaded to related documents, use this.
-	Filters []CascadeFilter
 }
 
 type CascadeFilter func(data map[string]interface{})
 
 // Cascades a document's properties to related documents, after it has been prepared
 // for db insertion (encrypted, etc)
-func CascadeSave(collection *Collection, doc interface{}, preparedForSave map[string]interface{}) error {
+func CascadeSave(collection *Collection, doc Document) error {
 	// Find out which properties to cascade
-	if conv, ok := doc.(interface {
-		GetCascade(*Collection) []*CascadeConfig
-	}); ok {
+	if conv, ok := doc.(CascadingDocument); ok {
 		toCascade := conv.GetCascade(collection)
 		for _, conf := range toCascade {
 
 			if len(conf.ReferenceQuery) == 0 {
-				conf.ReferenceQuery = []*ReferenceField{&ReferenceField{"_id", preparedForSave["_id"]}}
+				conf.ReferenceQuery = []*ReferenceField{&ReferenceField{"_id", doc.GetId()}}
 			}
-			_, err := cascadeSaveWithConfig(conf, preparedForSave)
+			_, err := cascadeSaveWithConfig(conf, doc)
 			if err != nil {
 				return err
 			}
@@ -79,8 +77,7 @@ func CascadeSave(collection *Collection, doc interface{}, preparedForSave map[st
 				results := conf.Collection.Find(conf.Query)
 
 				for results.Next(conf.Instance) {
-					prepared := conf.Collection.PrepDocumentForSave(conf.Instance)
-					err = CascadeSave(conf.Collection, conf.Instance, prepared)
+					err = CascadeSave(conf.Collection, conf.Instance)
 					if err != nil {
 						return err
 					}
@@ -153,54 +150,10 @@ func cascadeDeleteWithConfig(conf *CascadeConfig) (*mgo.ChangeInfo, error) {
 }
 
 // Runs a cascaded save operation with one configuration
-func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]interface{}) (*mgo.ChangeInfo, error) {
+func cascadeSaveWithConfig(conf *CascadeConfig, doc Document) (*mgo.ChangeInfo, error) {
 	// Create a new map with just the props to cascade
 
-	data := make(map[string]interface{})
-
-	for _, prop := range conf.Properties {
-		split := strings.Split(prop, ".")
-
-		if len(split) == 1 {
-			data[prop] = preparedForSave[prop]
-		} else {
-			actualProp := split[len(split)-1]
-			split := append([]string{}, split[:len(split)-1]...)
-			curData := data
-
-			for _, s := range split {
-				if _, ok := curData[s]; ok {
-					if mapped, ok := curData[s].(map[string]interface{}); ok {
-						curData = mapped
-					} else {
-						panic("Cannot access non-map property via dot notationa")
-					}
-
-				} else {
-					curData[s] = make(map[string]interface{})
-					if mapped, ok := curData[s].(map[string]interface{}); ok {
-						curData = mapped
-					} else {
-						panic("Cannot access non-map property via dot notationb")
-					}
-				}
-			}
-
-			val, _ := dotaccess.Get(preparedForSave, prop)
-			if bsonId, ok := val.(bson.ObjectId); ok {
-				if !bsonId.Valid() {
-					curData[actualProp] = ""
-					continue
-				}
-			}
-			curData[actualProp] = val
-		}
-
-	}
-
-	for _, f := range conf.Filters {
-		f(data)
-	}
+	data := conf.Data
 
 	switch conf.RelType {
 	case REL_ONE:
@@ -225,16 +178,14 @@ func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]inter
 			}
 		}
 
-		update := map[string]map[string]interface{}{
-			"$set": map[string]interface{}{},
-		}
+		update := make(map[string]interface{})
 
 		if len(conf.ThroughProp) > 0 {
-			update["$set"][conf.ThroughProp] = data
+			m := bson.M{}
+			m[conf.ThroughProp] = data
+			update["$set"] = m
 		} else {
-			for k, v := range data {
-				update["$set"][k] = v
-			}
+			update["$set"] = data
 		}
 
 		// Just update
@@ -266,7 +217,6 @@ func cascadeSaveWithConfig(conf *CascadeConfig, preparedForSave map[string]inter
 		}
 
 		update2["$push"][conf.ThroughProp] = data
-
 		return conf.Collection.Collection().UpdateAll(conf.Query, update2)
 
 	}

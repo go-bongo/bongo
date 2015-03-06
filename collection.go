@@ -4,14 +4,60 @@ import (
 	"errors"
 	// "fmt"
 
-	"github.com/maxwellhealth/mgo"
-	"github.com/maxwellhealth/mgo/bson"
-	"github.com/oleiade/reflections"
+	"labix.org/v2/mgo"
+	"labix.org/v2/mgo/bson"
+	// "github.com/oleiade/reflections"
 	"time"
 	// "reflect"
 	// "math"
 	// "strings"
 )
+
+type BeforeSaveHook interface {
+	BeforeSave(*Collection) error
+}
+
+type AfterSaveHook interface {
+	AfterSave(*Collection) error
+}
+
+type BeforeDeleteHook interface {
+	BeforeDelete(*Collection) error
+}
+
+type AfterDeleteHook interface {
+	AfterDelete(*Collection) error
+}
+
+type AfterFindHook interface {
+	AfterFind(*Collection) error
+}
+
+type ValidateHook interface {
+	Validate(*Collection) []string
+}
+
+type ValidationError struct {
+	Errors []string
+}
+
+type TimeTracker interface {
+	SetCreated(time.Time)
+	SetModified(time.Time)
+}
+
+type Document interface {
+	GetId() bson.ObjectId
+	SetId(bson.ObjectId)
+}
+
+type CascadingDocument interface {
+	GetCascade(*Collection) []*CascadeConfig
+}
+
+func (v *ValidationError) Error() string {
+	return "Validation failed"
+}
 
 type Collection struct {
 	Name       string
@@ -37,177 +83,88 @@ func (c *Collection) collectionOnSession(sess *mgo.Session) *mgo.Collection {
 	return sess.DB(c.Connection.Config.Database).C(c.Name)
 }
 
-func (c *Collection) Save(mod interface{}) (result *SaveResult) {
+func (c *Collection) Save(doc Document) error {
+	var err error
 	sess := c.Connection.Session.Clone()
 	defer sess.Close()
 
+	// Per mgo's recommendation, create a clone of the session so there is no blocking
 	col := c.collectionOnSession(sess)
-	// defer func() {
-
-	// 	if r := recover(); r != nil {
-	// 		if e, ok := r.(error); ok {
-	// 			result = NewSaveResult(false, e)
-	// 		} else if e, ok := r.(string); ok {
-	// 			result = NewSaveResult(false, errors.New(e))
-	// 		} else {
-	// 			result = NewSaveResult(false, errors.New(fmt.Sprint(r)))
-	// 		}
-
-	// 	}
-	// }()
-
-	// 1) Make sure mod has an Id field
-	ensureIdField(mod)
-
-	// 2) If there's no ID, create a new one
-	f, err := reflections.GetField(mod, "Id")
-	id := f.(bson.ObjectId)
-
-	if err != nil {
-		panic(err)
-	}
-
-	isNew := false
 
 	// Validate?
-	if validator, ok := mod.(interface {
-		Validate(*Collection) []string
-	}); ok {
+	if validator, ok := doc.(ValidateHook); ok {
 		errs := validator.Validate(c)
 
 		if len(errs) > 0 {
-			err := NewSaveResult(false, errors.New("Validation failed"))
-			err.ValidationErrors = errs
+			return &ValidationError{errs}
+		}
+	}
+
+	if hook, ok := doc.(BeforeSaveHook); ok {
+		err := hook.BeforeSave(c)
+		if err != nil {
 			return err
 		}
 	}
 
-	// If the model implements the NewTracker interface, we'll use that to determine newness rather than the validity of the ID field. This is still OK, but say you set the ID before saving, that will mean it'll think it's not new and could cause you some problems.
+	// If the model implements the NewTracker interface, we'll use that to determine newness. Otherwise always assume it's new
 
-	if newt, ok := mod.(NewTracker); ok {
+	isNew := true
+	if newt, ok := doc.(NewTracker); ok {
 		isNew = newt.IsNew()
-
-		if !id.Valid() {
-			id = bson.NewObjectId()
-			err := reflections.SetField(mod, "Id", id)
-
-			if err != nil {
-				panic(err)
-			}
-		}
-	} else if !id.Valid() {
-		id = bson.NewObjectId()
-		err := reflections.SetField(mod, "Id", id)
-
-		if err != nil {
-			panic(err)
-		}
-
-		isNew = true
-
-	}
-
-	if isNew {
-		if hook, ok := mod.(interface {
-			BeforeCreate(*Collection)
-		}); ok {
-			hook.BeforeCreate(c)
-		}
-	} else if hook, ok := mod.(interface {
-		BeforeUpdate(*Collection)
-	}); ok {
-		hook.BeforeUpdate(c)
-	}
-
-	if hook, ok := mod.(interface {
-		BeforeSave(*Collection)
-	}); ok {
-		hook.BeforeSave(c)
-	}
-
-	// 3) Convert the model into a map so we can automatically set the bson to camel case, add created and modified timestamps, filter out properties that are "cascadedFrom", etc
-	modelMap := c.PrepDocumentForSave(mod)
-
-	// Run hook for Before(Create/Update/Save)Map.
-	if isNew {
-		if hook, ok := mod.(interface {
-			BeforeCreateMap(*Collection, map[string]interface{})
-		}); ok {
-			hook.BeforeCreateMap(c, modelMap)
-		}
-	} else if hook, ok := mod.(interface {
-		BeforeUpdateMap(*Collection, map[string]interface{})
-	}); ok {
-		hook.BeforeUpdateMap(c, modelMap)
-	}
-
-	if hook, ok := mod.(interface {
-		BeforeSaveMap(*Collection, map[string]interface{})
-	}); ok {
-		hook.BeforeSaveMap(c, modelMap)
 	}
 
 	// Add created/modified time. Also set on the model itself if it has those fields.
 	now := time.Now()
 
-	if isNew {
-		if has, _ := reflections.HasField(mod, "Created"); has {
-			reflections.SetField(mod, "Created", now)
+	if tt, ok := doc.(TimeTracker); ok {
+		if isNew {
+			tt.SetCreated(now)
 		}
-		modelMap["_created"] = now
-	}
-	if has, _ := reflections.HasField(mod, "Modified"); has {
-		reflections.SetField(mod, "Modified", now)
-	}
-	modelMap["_modified"] = time.Now()
-
-	// 4) Cascade?
-	err = CascadeSave(c, mod, modelMap)
-	if err != nil {
-		panic(err)
+		tt.SetModified(now)
 	}
 
-	// 5) Save (upsert)
-	_, err = col.UpsertId(id, modelMap)
+	go CascadeSave(c, doc)
 
-	if err != nil {
-		panic(err)
+	id := doc.GetId()
+
+	if !isNew && !id.Valid() {
+		return errors.New("New tracker says this document isn't new but there is no valid Id field")
 	}
 
-	// 6) Run afterSave hooks
 	if isNew {
-		if hook, ok := mod.(interface {
-			AfterCreate(*Collection)
-		}); ok {
-			hook.AfterCreate(c)
+		// Generate an Id
+		id = bson.NewObjectId()
+		doc.SetId(id)
+	}
+
+	_, err = col.UpsertId(id, doc)
+
+	if err != nil {
+		return err
+	}
+
+	if hook, ok := doc.(AfterSaveHook); ok {
+		err = hook.AfterSave(c)
+		if err != nil {
+			return err
 		}
-	} else if hook, ok := mod.(interface {
-		AfterUpdate(*Collection)
-	}); ok {
-		hook.AfterUpdate(c)
 	}
 
-	if hook, ok := mod.(interface {
-		AfterSave(*Collection)
-	}); ok {
-		hook.AfterSave(c)
-	}
-
-	// Leave this to the user.
-	// if trackable, ok := mod.(Trackable); ok {
-	// 	tracker := trackable.GetDiffTracker()
-	// 	tracker.Reset()
-	// }
-
-	if newt, ok := mod.(NewTracker); ok {
+	// We saved it, no longer new
+	if newt, ok := doc.(NewTracker); ok {
 		newt.SetIsNew(false)
 	}
-	return NewSaveResult(true, nil)
+
+	return nil
 }
 
-func (c *Collection) FindById(id bson.ObjectId, mod interface{}) error {
+func (c *Collection) FindById(id bson.ObjectId, doc interface{}) error {
 
-	err := c.Collection().FindId(id).One(mod)
+	err := c.Collection().FindId(id).One(doc)
+
+	// Handle errors coming from mgo - we want to convert it to a DocumentNotFoundError so people can figure out
+	// what the error type is without looking at the text
 	if err != nil {
 		if err.Error() == "not found" {
 			return &DocumentNotFoundError{}
@@ -216,23 +173,23 @@ func (c *Collection) FindById(id bson.ObjectId, mod interface{}) error {
 		}
 	}
 
-	if hook, ok := mod.(interface {
-		AfterFind(*Collection)
-	}); ok {
-		hook.AfterFind(c)
+	if hook, ok := doc.(AfterFindHook); ok {
+		err = hook.AfterFind(c)
+		if err != nil {
+			return err
+		}
 	}
 
-	if newt, ok := mod.(NewTracker); ok {
+	// We retrieved it, so set new to false
+	if newt, ok := doc.(NewTracker); ok {
 		newt.SetIsNew(false)
 	}
 	return nil
 }
 
-// Pass in the sample just so we can get the collection name
+// This doesn't actually do any DB interaction, it just creates the result set so we can
+// start looping through on the iterator
 func (c *Collection) Find(query interface{}) *ResultSet {
-	// defer sess.Close()
-
-	// col := c.Collection()
 	col := c.Collection()
 
 	// Count for testing
@@ -247,14 +204,16 @@ func (c *Collection) Find(query interface{}) *ResultSet {
 	return resultset
 }
 
-func (c *Collection) FindOne(query interface{}, mod interface{}) error {
+func (c *Collection) FindOne(query interface{}, doc interface{}) error {
 
 	// Now run a find
 	results := c.Find(query)
+	results.Query.Limit(1)
 
-	hasNext := results.Next(mod)
+	hasNext := results.Next(doc)
 
 	if !hasNext {
+		// There could have been an error fetching the next one, which would set the Error property on the resultset
 		if results.Error != nil {
 			return results.Error
 		} else {
@@ -263,42 +222,40 @@ func (c *Collection) FindOne(query interface{}, mod interface{}) error {
 
 	}
 
-	if newt, ok := mod.(NewTracker); ok {
+	if newt, ok := doc.(NewTracker); ok {
 		newt.SetIsNew(false)
 	}
 
 	return nil
 }
 
-func (c *Collection) Delete(mod interface{}) error {
+func (c *Collection) Delete(doc Document) error {
+	var err error
+	// Create a new session per mgo's suggestion to avoid blocking
 	sess := c.Connection.Session.Clone()
 	defer sess.Close()
-
 	col := c.collectionOnSession(sess)
 
-	ensureIdField(mod)
-	f, err := reflections.GetField(mod, "Id")
-	if err != nil {
-		return err
-	}
-	id := f.(bson.ObjectId)
-	if hook, ok := mod.(interface {
-		BeforeDelete(*Collection)
-	}); ok {
-		hook.BeforeDelete(c)
+	if hook, ok := doc.(BeforeDeleteHook); ok {
+		err := hook.BeforeDelete(c)
+		if err != nil {
+			return err
+		}
 	}
 
-	err = col.Remove(bson.M{"_id": id})
+	err = col.Remove(bson.M{"_id": doc.GetId()})
 
 	if err != nil {
 		return err
 	}
 
-	CascadeDelete(c, mod)
-	if hook, ok := mod.(interface {
-		AfterDelete(*Collection)
-	}); ok {
-		hook.AfterDelete(c)
+	go CascadeDelete(c, doc)
+
+	if hook, ok := doc.(AfterDeleteHook); ok {
+		err = hook.AfterDelete(c)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

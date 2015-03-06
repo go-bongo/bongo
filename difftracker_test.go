@@ -1,19 +1,19 @@
 package bongo
 
 import (
-	"github.com/maxwellhealth/mgo/bson"
-	. "gopkg.in/check.v1"
+	. "github.com/smartystreets/goconvey/convey"
 	"reflect"
+	"testing"
 	"time"
 )
 
 type FooChangeTest struct {
-	Id          bson.ObjectId `bson:"_id,omitempty"`
-	StringVal   string
-	IntVal      int
-	Timestamp   time.Time
-	diffTracker *DiffTracker
-	Arr         []string
+	DocumentBase `bson:",inline"`
+	StringVal    string
+	IntVal       int
+	Timestamp    time.Time
+	diffTracker  *DiffTracker
+	Arr          []string
 }
 
 func (f *FooChangeTest) GetDiffTracker() *DiffTracker {
@@ -30,59 +30,64 @@ type FooBarChangeTest struct {
 	BarVal string
 }
 
-func (s *TestSuite) TestGetChangedFields(c *C) {
-	foo1 := &FooChangeTest{
-		StringVal: "foo",
-		IntVal:    1,
-		Arr:       []string{},
-	}
-	foo2 := &FooChangeTest{
-		StringVal: "bar",
-		IntVal:    2,
-		Arr:       []string{},
-	}
+func TestDiffTracker(t *testing.T) {
+	Convey("DiffTracker", t, func() {
+		Convey("should get changed fields when comparing two structs", func() {
+			foo1 := &FooChangeTest{
+				StringVal: "foo",
+				IntVal:    1,
+				Arr:       []string{},
+			}
+			foo2 := &FooChangeTest{
+				StringVal: "bar",
+				IntVal:    2,
+				Arr:       []string{},
+			}
 
-	diffs, err := getChangedFields(foo1, foo2, false)
-	c.Assert(err, Equals, nil)
-	c.Assert(len(diffs), Equals, 2)
-	c.Assert(diffs[0], Equals, "StringVal")
-	c.Assert(diffs[1], Equals, "IntVal")
+			diffs, err := getChangedFields(foo1, foo2, false)
+			So(err, ShouldEqual, nil)
+			So(len(diffs), ShouldEqual, 2)
+			So(diffs[0], ShouldEqual, "StringVal")
+			So(diffs[1], ShouldEqual, "IntVal")
+		})
 
-	foobar1 := &FooBarChangeTest{
-		FooVal: &FooChangeTest{
-			StringVal: "foo",
-			IntVal:    5,
-		},
-		BarVal: "bar",
-	}
+		Convey("should get changed fields when comparing two structs with pointers", func() {
+			foobar1 := &FooBarChangeTest{
+				FooVal: &FooChangeTest{
+					StringVal: "foo",
+					IntVal:    5,
+				},
+				BarVal: "bar",
+			}
 
-	foobar2 := &FooBarChangeTest{
-		FooVal: &FooChangeTest{
-			StringVal: "foo",
-			IntVal:    10,
-			Timestamp: time.Now(),
-		},
-		BarVal: "BAR",
-	}
+			foobar2 := &FooBarChangeTest{
+				FooVal: &FooChangeTest{
+					StringVal: "foo",
+					IntVal:    10,
+					Timestamp: time.Now(),
+				},
+				BarVal: "BAR",
+			}
 
-	diffs, err = getChangedFields(foobar1, foobar2, false)
-	c.Assert(err, Equals, nil)
-	c.Assert(len(diffs), Equals, 3)
-	c.Assert(diffs[0], Equals, "FooVal.IntVal")
-	c.Assert(diffs[1], Equals, "FooVal.Timestamp")
-	c.Assert(diffs[2], Equals, "BarVal")
+			diffs, err := getChangedFields(foobar1, foobar2, false)
+			So(err, ShouldEqual, nil)
+			So(len(diffs), ShouldEqual, 3)
+			So(diffs[0], ShouldEqual, "FooVal.IntVal")
+			So(diffs[1], ShouldEqual, "FooVal.Timestamp")
+			So(diffs[2], ShouldEqual, "BarVal")
+		})
 
-}
+		Convey("should get fields modified since difftracker reset", func() {
+			foo1 := &FooChangeTest{
+				StringVal: "foo",
+				IntVal:    1,
+			}
 
-func (s *TestSuite) TestModified(c *C) {
-	foo1 := &FooChangeTest{
-		StringVal: "foo",
-		IntVal:    1,
-	}
+			foo1.GetDiffTracker().Reset()
+			So(foo1.diffTracker.Modified("StringVal"), ShouldEqual, false)
+			foo1.StringVal = "bar"
+			So(foo1.diffTracker.Modified("StringVal"), ShouldEqual, true)
+		})
+	})
 
-	foo1.GetDiffTracker().Reset()
-
-	foo1.StringVal = "bar"
-
-	c.Assert(foo1.diffTracker.Modified("StringVal"), Equals, true)
 }

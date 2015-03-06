@@ -1,70 +1,49 @@
 package bongo
 
 import (
-	"encoding/json"
-	"errors"
-	// "fmt"
-	. "gopkg.in/check.v1"
+	. "github.com/smartystreets/goconvey/convey"
+	"testing"
 )
 
-func (s *TestSuite) TestConnect(c *C) {
-
-	connection := new(Connection)
-
-	connection.Config = config
-
-	connection.Connect()
-	defer connection.Session.Close()
-
-	err := connection.Session.Ping()
-
-	c.Assert(err, Equals, nil)
-
-	connection.Session.DB(config.Database).DropDatabase()
-}
-
-func (s *TestSuite) TestRegister(c *C) {
-	connection := new(Connection)
-
-	connection.Config = config
-
-	connection.Connect()
-
-	connection.Register(&FooBar{}, "foo_bar")
-
-	indexes, err := connection.Collection("foo_bar").Collection().Indexes()
-
-	c.Assert(err, Equals, nil)
-
-	c.Assert(len(indexes), Equals, 2)
-	c.Assert(indexes[0].Key[0], Equals, "_id")
-	c.Assert(indexes[1].Key[0], Equals, "count")
-
-}
-
-type errorHolder struct {
-	Err *SaveResult
-}
-
-func (s *TestSuite) TestMarshalResult(c *C) {
-
-	err := NewSaveResult(false, errors.New("Failed to save"))
-
-	holder := &errorHolder{
-		Err: err,
+// For test usage
+func getConnection() *Connection {
+	conf := &Config{
+		ConnectionString: "localhost",
+		Database:         "bongotest",
 	}
 
-	marshaled, e := json.Marshal(holder)
-	c.Assert(e, IsNil)
+	conn, err := Connect(conf)
 
-	c.Assert(string(marshaled), Equals, `{"Err":"Failed to save"}`)
+	if err != nil {
+		panic(err)
+	}
 
-	holder.Err.ValidationErrors = []string{"foo", "bar"}
+	return conn
+}
 
-	marshaled, e = json.Marshal(holder)
-	c.Assert(e, IsNil)
+func TestConnect(t *testing.T) {
+	Convey("should be able to connect to a database using a config", t, func() {
+		conf := &Config{
+			ConnectionString: "localhost",
+			Database:         "bongotest",
+		}
 
-	c.Assert(string(marshaled), Equals, `{"Err":["foo","bar"]}`)
-	// fmt.Println(string(marshaled))
+		conn, err := Connect(conf)
+		defer conn.Session.Close()
+		So(err, ShouldEqual, nil)
 
+		err = conn.Session.Ping()
+		So(err, ShouldEqual, nil)
+	})
+}
+
+func TestRetrieveCollection(t *testing.T) {
+	Convey("should be able to retrieve a collection instance from a connection", t, func() {
+		conn := getConnection()
+		defer conn.Session.Close()
+		col := conn.Collection("tests")
+
+		So(col.Name, ShouldEqual, "tests")
+		So(col.Connection, ShouldEqual, conn)
+	})
 }

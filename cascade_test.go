@@ -1,26 +1,25 @@
 package bongo
 
 import (
-	// "fmt"
-	"github.com/maxwellhealth/mgo/bson"
-	. "gopkg.in/check.v1"
-	"log"
+	. "github.com/smartystreets/goconvey/convey"
+	"labix.org/v2/mgo/bson"
 	"reflect"
+	"testing"
+	"time"
 )
 
 type Parent struct {
-	Id          bson.ObjectId `bson:"_id"`
-	Bar         string        `bongo:"encrypted"`
-	Number      int
-	FooBar      string
-	Children    []ChildRef `bongo:"cascadedFrom=children"`
-	Child       ChildRef   `bongo:"cascadedFrom=children"`
-	ChildProp   string     `bson:"childProp"`
-	diffTracker *DiffTracker
+	DocumentBase `bson:",inline"`
+	Bar          string
+	Number       int
+	FooBar       string
+	Children     []ChildRef
+	Child        ChildRef
+	ChildProp    string `bson:"childProp"`
+	diffTracker  *DiffTracker
 }
 
 func (f *Parent) GetDiffTracker() *DiffTracker {
-	log.Println("Getting diff tracker")
 	v := reflect.ValueOf(f.diffTracker)
 	if !v.IsValid() || v.IsNil() {
 		f.diffTracker = NewDiffTracker(f)
@@ -29,12 +28,27 @@ func (f *Parent) GetDiffTracker() *DiffTracker {
 	return f.diffTracker
 }
 
+type Child struct {
+	DocumentBase `bson:",inline"`
+	ParentId     bson.ObjectId `bson:",omitempty"`
+	Name         string
+	SubChild     SubChildRef `bson:"subChild"`
+	ChildProp    string
+	diffTracker  *DiffTracker
+}
+
 func (c *Child) GetCascade(collection *Collection) []*CascadeConfig {
 
+	ref := ChildRef{
+		Id:       c.Id,
+		Name:     c.Name,
+		SubChild: c.SubChild,
+	}
 	connection := collection.Connection
 	cascadeSingle := &CascadeConfig{
 		Collection:  connection.Collection("parents"),
 		Properties:  []string{"_id", "name", "subChild.foo", "subChild._id"},
+		Data:        ref,
 		ThroughProp: "child",
 		RelType:     REL_ONE,
 		Query: bson.M{
@@ -43,10 +57,12 @@ func (c *Child) GetCascade(collection *Collection) []*CascadeConfig {
 	}
 
 	cascadeCopy := &CascadeConfig{
-		Collection:  connection.Collection("parents"),
-		Properties:  []string{"childProp"},
-		ThroughProp: "",
-		RelType:     REL_ONE,
+		Collection: connection.Collection("parents"),
+		Properties: []string{"childProp"},
+		Data: map[string]interface{}{
+			"childProp": c.ChildProp,
+		},
+		RelType: REL_ONE,
 		Query: bson.M{
 			"_id": c.ParentId,
 		},
@@ -55,6 +71,7 @@ func (c *Child) GetCascade(collection *Collection) []*CascadeConfig {
 	cascadeMulti := &CascadeConfig{
 		Collection:  connection.Collection("parents"),
 		Properties:  []string{"_id", "name", "subChild.foo", "subChild._id"},
+		Data:        ref,
 		ThroughProp: "children",
 		RelType:     REL_MANY,
 		Query: bson.M{
@@ -63,6 +80,7 @@ func (c *Child) GetCascade(collection *Collection) []*CascadeConfig {
 	}
 
 	if c.GetDiffTracker().Modified("ParentId") {
+
 		origId, _ := c.diffTracker.GetOriginalValue("ParentId")
 		if origId != nil {
 			oldQuery := bson.M{
@@ -78,11 +96,31 @@ func (c *Child) GetCascade(collection *Collection) []*CascadeConfig {
 	return []*CascadeConfig{cascadeSingle, cascadeMulti, cascadeCopy}
 }
 
+func (f *Child) GetDiffTracker() *DiffTracker {
+	v := reflect.ValueOf(f.diffTracker)
+	if !v.IsValid() || v.IsNil() {
+		f.diffTracker = NewDiffTracker(f)
+	}
+
+	return f.diffTracker
+}
+
+type SubChild struct {
+	DocumentBase `bson:",inline"`
+	Foo          string
+	ChildId      bson.ObjectId
+}
+
 func (c *SubChild) GetCascade(collection *Collection) []*CascadeConfig {
+	ref := SubChildRef{
+		Id:  c.Id,
+		Foo: c.Foo,
+	}
 	connection := collection.Connection
 	cascadeSingle := &CascadeConfig{
 		Collection:  connection.Collection("children"),
 		Properties:  []string{"_id", "foo"},
+		Data:        ref,
 		ThroughProp: "subChild",
 		RelType:     REL_ONE,
 		Query: bson.M{
@@ -95,30 +133,6 @@ func (c *SubChild) GetCascade(collection *Collection) []*CascadeConfig {
 	return []*CascadeConfig{cascadeSingle}
 }
 
-type Child struct {
-	Id          bson.ObjectId `bson:"_id"`
-	ParentId    bson.ObjectId
-	Name        string `bongo:"encrypted"`
-	SubChild    SubChildRef
-	ChildProp   string
-	diffTracker *DiffTracker
-}
-
-func (f *Child) GetDiffTracker() *DiffTracker {
-	v := reflect.ValueOf(f.diffTracker)
-	if !v.IsValid() || v.IsNil() {
-		f.diffTracker = NewDiffTracker(f)
-	}
-
-	return f.diffTracker
-}
-
-type SubChild struct {
-	Id      bson.ObjectId `bson:"_id,omitempty"`
-	Foo     string
-	ChildId bson.ObjectId `bson:",omitempty"`
-}
-
 type SubChildRef struct {
 	Id  bson.ObjectId `bson:"_id,omitempty"`
 	Foo string
@@ -126,104 +140,115 @@ type SubChildRef struct {
 
 type ChildRef struct {
 	Id       bson.ObjectId `bson:"_id,omitempty"`
-	Name     string        `bongo:"encrypted"`
+	Name     string
 	SubChild SubChildRef
 }
 
-func (s *TestSuite) TestCascade(c *C) {
+func TestCascade(t *testing.T) {
+	connection := getConnection()
+	// defer connection.Session.Close()
 
-	collection := connection.Collection("parents")
+	Convey("Cascade Save/Delete - full runthrough", t, func() {
+		connection.Session.DB("bongotest").DropDatabase()
+		collection := connection.Collection("parents")
 
-	childCollection := connection.Collection("children")
-	subchildCollection := connection.Collection("subchildren")
-	parent := &Parent{
-		Bar:    "Testy McGee",
-		Number: 5,
-	}
+		childCollection := connection.Collection("children")
+		subchildCollection := connection.Collection("subchildren")
+		parent := &Parent{
+			Bar:    "Testy McGee",
+			Number: 5,
+		}
 
-	parent2 := &Parent{
-		Bar:    "Other Parent",
-		Number: 10,
-	}
+		parent2 := &Parent{
+			Bar:    "Other Parent",
+			Number: 10,
+		}
 
-	res := collection.Save(parent)
+		err := collection.Save(parent)
+		So(err, ShouldEqual, nil)
+		err = collection.Save(parent2)
+		So(err, ShouldEqual, nil)
 
-	c.Assert(res.Success, Equals, true)
-	res = collection.Save(parent2)
-	c.Assert(res.Success, Equals, true)
+		child := &Child{
+			ParentId:  parent.Id,
+			Name:      "Foo McGoo",
+			ChildProp: "Doop McGoop",
+		}
+		err = childCollection.Save(child)
 
-	child := &Child{
-		ParentId:  parent.Id,
-		Name:      "Foo McGoo",
-		ChildProp: "Doop McGoop",
-	}
+		// Wait a sec for the go routine to finish.
+		time.Sleep(100 * time.Millisecond)
 
-	res = childCollection.Save(child)
+		So(err, ShouldEqual, nil)
 
-	if !res.Success {
-		log.Println(res.Error())
-		return
-	}
-	c.Assert(res.Success, Equals, true)
-	child.GetDiffTracker().Reset()
-	newParent := &Parent{}
-	collection.FindById(parent.Id, newParent)
+		child.GetDiffTracker().Reset()
+		newParent := &Parent{}
+		collection.FindById(parent.Id, newParent)
 
-	c.Assert(newParent.Child.Name, Equals, "Foo McGoo")
+		So(newParent.Child.Name, ShouldEqual, "Foo McGoo")
+		So(newParent.Child.Id.Hex(), ShouldEqual, child.Id.Hex())
+		So(newParent.Children[0].Name, ShouldEqual, "Foo McGoo")
+		So(newParent.Children[0].Id.Hex(), ShouldEqual, child.Id.Hex())
 
-	c.Assert(newParent.Child.Id.Hex(), Equals, child.Id.Hex())
-	c.Assert(newParent.Children[0].Name, Equals, "Foo McGoo")
-	c.Assert(newParent.Children[0].Id.Hex(), Equals, child.Id.Hex())
-	// No through prop should populate directly o the parent
-	newMap := make(map[string]interface{})
-	collection.Collection().FindId(parent.Id).One(newMap)
+		// No through prop should populate directly o the parent
+		So(newParent.ChildProp, ShouldEqual, "Doop McGoop")
 
-	c.Assert(newParent.ChildProp, Equals, "Doop McGoop")
+		// Now change the child parent Id...
+		child.ParentId = parent2.Id
+		So(child.GetDiffTracker().Modified("ParentId"), ShouldEqual, true)
 
-	// Now change the child parent Id...
-	child.ParentId = parent2.Id
-	c.Assert(child.GetDiffTracker().Modified("ParentId"), Equals, true)
+		err = childCollection.Save(child)
+		So(err, ShouldEqual, nil)
 
-	res = childCollection.Save(child)
-	child.diffTracker.Reset()
-	c.Assert(res.Success, Equals, true)
-	// Now make sure it says the parent id DIDNT change, because we just reset the tracker
-	c.Assert(child.GetDiffTracker().Modified("ParentId"), Equals, false)
+		// Wait a sec for the go routine to finish.
+		time.Sleep(100 * time.Millisecond)
 
-	newParent1 := &Parent{}
-	collection.FindById(parent.Id, newParent1)
-	c.Assert(newParent1.Child.Name, Equals, "")
-	c.Assert(newParent1.ChildProp, Equals, "")
-	c.Assert(len(newParent1.Children), Equals, 0)
-	newParent2 := &Parent{}
-	collection.FindById(parent2.Id, newParent2)
-	c.Assert(newParent2.ChildProp, Equals, "Doop McGoop")
-	c.Assert(newParent2.Child.Name, Equals, "Foo McGoo")
-	c.Assert(newParent2.Child.Id.Hex(), Equals, child.Id.Hex())
-	c.Assert(newParent2.Children[0].Name, Equals, "Foo McGoo")
-	c.Assert(newParent2.Children[0].Id.Hex(), Equals, child.Id.Hex())
+		child.diffTracker.Reset()
+		// Now make sure it says the parent id DIDNT change, because we just reset the tracker
+		So(child.GetDiffTracker().Modified("ParentId"), ShouldEqual, false)
 
-	// Make a new sub child, save it, and it should cascade to the child AND the parent
-	subChild := &SubChild{
-		Foo:     "MySubChild",
-		ChildId: child.Id,
-	}
+		newParent1 := &Parent{}
+		collection.FindById(parent.Id, newParent1)
+		So(newParent1.Child.Name, ShouldEqual, "")
+		So(newParent1.ChildProp, ShouldEqual, "")
+		So(len(newParent1.Children), ShouldEqual, 0)
+		newParent2 := &Parent{}
+		collection.FindById(parent2.Id, newParent2)
+		So(newParent2.ChildProp, ShouldEqual, "Doop McGoop")
+		So(newParent2.Child.Name, ShouldEqual, "Foo McGoo")
+		So(newParent2.Child.Id.Hex(), ShouldEqual, child.Id.Hex())
+		So(newParent2.Children[0].Name, ShouldEqual, "Foo McGoo")
+		So(newParent2.Children[0].Id.Hex(), ShouldEqual, child.Id.Hex())
 
-	res = subchildCollection.Save(subChild)
-	c.Assert(res.Success, Equals, true)
+		// Make a new sub child, save it, and it should cascade to the child AND the parent
+		subChild := &SubChild{
+			Foo:     "MySubChild",
+			ChildId: child.Id,
+		}
 
-	// Fetch the parent
-	newParent3 := &Parent{}
-	collection.FindById(parent2.Id, newParent3)
-	c.Assert(newParent3.Child.SubChild.Foo, Equals, "MySubChild")
-	c.Assert(newParent3.Child.SubChild.Id.Hex(), Equals, subChild.Id.Hex())
+		err = subchildCollection.Save(subChild)
+		So(err, ShouldEqual, nil)
 
-	newParent4 := &Parent{}
-	err := childCollection.Delete(child)
-	c.Assert(err, Equals, nil)
-	collection.FindById(parent2.Id, newParent4)
-	c.Assert(newParent4.Child.Name, Equals, "")
-	c.Assert(newParent4.ChildProp, Equals, "")
-	c.Assert(len(newParent4.Children), Equals, 0)
+		// Wait a sec for the go routine to finish.
+		time.Sleep(100 * time.Millisecond)
 
+		// Fetch the parent
+		newParent3 := &Parent{}
+		collection.FindById(parent2.Id, newParent3)
+		So(newParent3.Child.SubChild.Foo, ShouldEqual, "MySubChild")
+		So(newParent3.Child.SubChild.Id.Hex(), ShouldEqual, subChild.Id.Hex())
+
+		newParent4 := &Parent{}
+		err = childCollection.Delete(child)
+
+		// Wait a sec for the go routine to finish.
+		time.Sleep(100 * time.Millisecond)
+
+		So(err, ShouldEqual, nil)
+		collection.FindById(parent2.Id, newParent4)
+		So(newParent4.Child.Name, ShouldEqual, "")
+		So(newParent4.ChildProp, ShouldEqual, "")
+		So(len(newParent4.Children), ShouldEqual, 0)
+
+	})
 }

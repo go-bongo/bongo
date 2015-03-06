@@ -1,5 +1,5 @@
 # What's Bongo?
-We couldn't find a good ODM for MongoDB written in Go, so we made one. Bongo is a wrapper for mgo (https://github.com/go-mgo/mgo) that adds ODM, hooks, validation, cascade support, and HIPAA-compliant encryption to its standard Mongo functions.
+We couldn't find a good ODM for MongoDB written in Go, so we made one. Bongo is a wrapper for mgo (https://github.com/go-mgo/mgo) that adds ODM, hooks, validation, and cascade support to its raw Mongo functions.
 
 # Usage
 
@@ -21,11 +21,8 @@ Create a new `bongo.Config` instance:
 config := &bongo.Config{
 	ConnectionString: "localhost",
 	Database:         "bongotest",
-	EncryptionKey:    []byte("MyEncryptionKey"),
 }
 ```
-
-Yep! Bongo has built-in support for encrypted fields (for HIPAA compliance) and even encryption keys per collection (use the `EncryptionKeyPerCollection map[string]string`).
 
 Then just create a new instance of `bongo.Connection`:
 
@@ -35,93 +32,56 @@ connection := bongo.Connect(config)
 
 If you need to, you can access the raw `mgo` session with `connection.Session`
 
-### Create a Model
+### Create a Document
 
-Any struct can be used as a model as long as it has an Id property with type `bson.ObjectId` (from `mgo/bson`). `bson` tags are passed through to mgo. You can specify a field as being encrypted using `bongo:"encrypted"`
+Any struct can be used as a document as long as it satisfies the `Document` interface (`SetId(bson.ObjectId)`, `GetId() bson.ObjectId`). We recommend that you use the `DocumentBase` provided with Bongo, which implements that interface as well as the `NewTracker` and `TimeTracker` interfaces (to keep track of new/existing documents and created/modified timestamps). If you use the `DocumentBase` or something similar, make sure you use `bson:",inline"` otherwise you will get nested behavior when the data goes to your database.
 
 For example:
 
 ```go
 
 type Person struct {
-	Id bson.ObjectId `bson:"_id"`
-	FirstName string `bongo:"encrypted" bson:"firstName"`
-	LastName string `bongo:"encrypted" bson:"lastName"`
+	bongo.DocumentBase `bson:",inline"`
+	FirstName string
+	LastName string
 	Gender string
 }
 ```
 
-You can use child structs as well. If encrypted, they will be inserted into the database as one field (encrypted json-encoded string).
+You can use child structs as well.
 
 ```go
-type Address struct {
-	Street string
-	Suite string
-	City string
-	State string
-	Zip string
-}
+
 
 type Person struct {
-	Id bson.ObjectId `bson:"_id"`
-	FirstName string `bongo:"encrypted" bson:"firstName"`
-	LastName string `bongo:"encrypted" bson:"lastName"`
+	bongo.DocumentBase `bson:",inline"`
+	FirstName string
+	LastName string
 	Gender string
-	HomeAddress Address `bongo:"encrypted" bson:"homeAddress"`
+	HomeAddress struct {
+		Street string
+		Suite string
+		City string
+		State string
+		Zip string
+	} 
 }
-```
-
-### Note on Encryption
-If you have an encrypted field that is a pointer to a `struct`, you need to make sure that field is instantiated on any model you are saving to the database. Otherwise the encrypted string will end up as "null" and the marshaler will have issues trying to marshal that back into a struct.
-
-### Indexing
-
-You can use tags to ensure indeces on your collections. The mere presence of an `index` tag will cause Bongo to ensure an index on that field when your model is registered. If you also have the "unique" tag, it will be a unique index.
-
-```go
-type Person struct {
-	Id bson.ObjectId `bson:"_id"`
-	FirstName string `bongo:"encrypted" bson:"firstName"`
-	LastName string `bongo:"encrypted" bson:"lastName"`
-	Gender string `bongo:"index"`
-	Email string `bongo:"index,unique"`
-}
-```
-
-To register your model, you should do the following at boot time. This will ensure the indeces defined in `Person` will be present in the `"people"` collection. If you leave the second argument as a blank string, it will interpret the collection name from the name of the struct (in this case getting "person")
-
-```go
-connection.Register(&Person{}, "people")
 ```
 
 #### Hooks
 
-You can add special methods to your struct that will automatically get called by bongo during certain actions. Hooks get passed the current `*bongo.Collection` so you can avoid having to couple them with your actual database layer. Currently available hooks are:
+You can add special methods to your document type that will automatically get called by bongo during certain actions. Hooks get passed the current `*bongo.Collection` so you can avoid having to couple them with your actual database layer. Currently available hooks are:
 
-* `func (s *ModelStruct) Validate(*bongo.Collection) []string` (returns a slice of errors)
-* `func (s *ModelStruct) BeforeSave(*bongo.Collection)`
-* `func (s *ModelStruct) BeforeCreate(*bongo.Collection)`
-* `func (s *ModelStruct) BeforeUpdate(*bongo.Collection)`
-* `func (s *ModelStruct) AfterSave(*bongo.Collection)`
-* `func (s *ModelStruct) AfterCreate(*bongo.Collection)`
-* `func (s *ModelStruct) AfterUpdate(*bongo.Collection)`
-* `func (s *ModelStruct) AfterFind(*bongo.Collection)`
-
-The create/update hooks run immediately before the save hooks.
-	
-#### Validation
-
-Use the `Validate()` hook to validate your model. If you return a slice with at least one element, the `Save()` method will fail. Bongo comes with some built-in validation methods:
-
-* `func bongo.ValidateRequired(val interface{}) bool` - makes sure the provided val is not equal to its type's zero-value
-* `func bongo.ValidateMongoIdRef(val interface{}, collection *bongo.Collection) bool` - makes sure the provided val (`bson.ObjectId`) references a document in the provided collection
-* `func bongo.ValidateInclusionIn(value string, options []string) bool` - make sure the provided `string` val matches an element in the given options
-
-You can obviously use your own validation as long as you add elements to the returned `[]string`
+* `func (s *ModelStruct) Validate(*bongo.Collection) []string` (returns a slice of errors - if it is empty then it is assumed that validation succeeded)
+* `func (s *ModelStruct) BeforeSave(*bongo.Collection) error`
+* `func (s *ModelStruct) AfterSave(*bongo.Collection) error`
+* `func (s *ModelStruct) BeforeDelete(*bongo.Collection) error`
+* `func (s *ModelStruct) AfterDelete(*bongo.Collection) error`
+* `func (s *ModelStruct) AfterFind(*bongo.Collection) error`
 
 ### Saving Models
 
-Bongo can intelligently guess the name of the collection using the name of the struct you pass. (e.g. "FooBar" would go in as "foo_bar"). If you're OK with that, you can save directly via your connection:
+Just call `save` on a collection instance.
 
 ```go
 myPerson := &Person{
@@ -129,35 +89,22 @@ myPerson := &Person{
 	LastName:"McGee",
 	Gender:"male",
 }
-saveResult := connection.Save(myPerson)
+err := connection.Collection("people").Save(myPerson)
 ```
 
-You will now have a new document in the `person` collection.
-
-To insert this into a collection called "people", you can do the following:
+Now you'll have a new document in the `people` collection. If there is an error, you can check if it is a validation error using a type assertion:
 
 ```go
-myPerson := &Person{
-	FirstName:"Testy",
-	LastName:"McGee",
-	Gender:"male",
+if vErr, ok := err.(*bongo.ValidationError); ok {
+	fmt.Println("Validation errors are:", vErr.Errors)
+} else {
+	fmt.Println("Got a real error:", err.Error())
 }
-saveResult := connection.Collection("people").Save(myPerson)
 ```
 
-Now you'll have a new document in the `people` collection.
+### Deleting Documents
 
-### Deleting Models
-
-Same deal as save.
-
-To delete from the "person" collection (assuming person is a full struct with a valid Id property):
-
-```go
-err := connection.Delete(person)
-```
-
-Or from the "people" collection (same assumption):
+Same thing as `Save` - just call `Delete` on the collection and pass the document instance.
 ```go
 err := connection.Collection("people").Delete(person)
 ```
@@ -165,42 +112,31 @@ err := connection.Collection("people").Delete(person)
 
 ### Find by ID
 
-Same thing applies re: collection name. This will look in "person" and populate the reference of `person`:
-
 ```go
-import "github.com/maxwellhealth/mgo/bson"
-
-...
-
-person := new(Person)
-
-err := connection.FindById(bson.ObjectIdHex(StringId), person)
+person := &Person{}
+err := connection.Collection("people").FindById(bson.ObjectIdHex(StringId), person)
 ```
 
-And this will look in "people":
+The error returned can be a `DocumentNotFoundError` or a more low-level MongoDB error. To check, use a type assertion:
 
 ```go
-import "github.com/maxwellhealth/mgo/bson"
-
-...
-
-person := new(Person)
-
-err := connection.Collection("people").FindById(bson.ObjectIdHex(StringId), person)
+if dnfError, ok := err.(*bongo.DocumentNotFoundError); ok {
+	fmt.Println("document not found"")
+} else {
+	fmt.Println("real error " + err.Error())
+}
 ```
 
 ### Find
 
-Find's a bit different - it's not a direct operation on a model reference so you can either call it directly on the `bongo.Connection`, passing either a sample struct or the collection name as the second argument so it knows which collection look in. You can also call `Collection.Find`, in which case you will only have to pass one argument (the query).
+Finds will return an instance of `ResultSet`, which you can then optionally `Paginate` and iterate through to get all results.
 
 ```go
 
 // *bongo.ResultSet
-results := connection.Find(bson.M{"firstName":"Bob"}, "people")
+results := connection.Collection("people").Find(bson.M{"firstName":"Bob"})
 
-// OR: connection.Collection("people").Find(bson.M{"firstName":"Bob"})
-
-person := new(Person)
+person := &Person{}
 
 count := 0
 
@@ -209,38 +145,24 @@ for results.Next(person) {
 }
 ```
 
-You can also pass a sample reference as the second argument instead of a string. This will look in the "person" collection instead of "people":
+To paginate, you can run `Paginate(perPage int, currentPage int)` on the result of `connection.Find()`. That will return an instance of `bongo.PaginationInfo`, with properties like `TotalRecords`, `RecordsOnPage`, etc. 
 
-```go
-results := connection.Find(nil, &Person{})
-```
-
-To paginate, you can run `Paginate(perPage int, currentPage int)` on the result of `connection.Find()`.
-
-To use additional functions like `sort`, you can access the underlying mgo `Query` via `ResultSet.Query`.
+To use additional functions like `sort`, `skip`, `limit`, etc, you can access the underlying mgo `Query` via `ResultSet.Query`.
 
 ### Find One
-Same as find, but it will populate the reference of the struct you provide as the second argument. If there is no document found, you will get an error:
+Same as find, but it will populate the reference of the struct you provide as the second argument.
 
 
 ```go
-import (
-	"github.com/maxwellhealth/mgo/bson"
-	"fmt"
-)
 
-...
+person := &Person{}
 
-person := new(Person)
-
-err := connection.FindOne(bson.M{"firstName":"Bob"}, person)
-
-// Or connection.Collection("people").FindOne(bson.M{"firstName":"Bob"}) if you want to search the "people" collection
+err := connection.Collection("people").FindOne(bson.M{"firstName":"Bob"})
 
 if err != nil {
 	fmt.Println(err.Error())
 } else {
-	fmt.Println("Found user:", person.firstName)
+	fmt.Println("Found user:", person.FirstName)
 }
 ```
 
@@ -249,7 +171,7 @@ If your model struct implements the `Trackable` interface, it will automatically
 
 ```go
 type MyModel struct {
-	Id bson.ObjectId `bson:"_id"`
+	bongo.DocumentBase `bson:",inline"`
 	StringVal string
 	diffTracker *bongo.DiffTracker
 }
@@ -328,18 +250,30 @@ type CascadeConfig struct {
 	// The data that constructs the query may have changed - this is to remove self from previous relations
 	OldQuery bson.M
 
-	// Data to cascade. Can be in dot notation
+	// Properties that will be cascaded/deleted. Can (should) be in dot notation for nested properties. This is used to nullify properties when there is an OldQuery or if the document is deleted.
 	Properties []string
+	
+	// The actual data that will be cascade
+	Data interface{}
 }
 ```
 
 ### Example
 ```go
+type ChildRef struct {
+	Id bson.ObjectId `bson:"_id" json:"_id"`
+	Name string
+}
 func (c *Child) GetCascade(collection *bongo.Collection) []*bongo.CascadeConfig {
 	connection := collection.Connection
+	rel := &ChildRef {
+		Id:c.Id,
+		Name:c.Name,
+	}
 	cascadeSingle := &bongo.CascadeConfig{
 		Collection:  connection.Collection("parents").Collection(),
 		Properties:  []string{"name"},
+		Rel:rel,
 		ThroughProp: "child",
 		RelType:     bongo.REL_ONE,
 		Query: bson.M{
@@ -350,6 +284,7 @@ func (c *Child) GetCascade(collection *bongo.Collection) []*bongo.CascadeConfig 
 	cascadeMulti := &bongo.CascadeConfig{
 		Collection:  connection.Collection("parents").Collection(),
 		Properties:  []string{"name"},
+		Rel:rel,
 		ThroughProp: "children",
 		RelType:     bongo.REL_MANY,
 		Query: bson.M{
@@ -384,9 +319,4 @@ This does the following:
 
 4) When you delete a child, it will also use `cascadeMulti.OldQuery` to remove the reference from its previous `parent.children`
 
-Note that the `ThroughProp` must be the actual field name in the database, not the property name on the struct.
-
-# Credits
-* Mongoose for inspiration
-* Mitchell Hashimoto for his mapstructure repo (https://github.com/mitchellh/mapstructure), the codec for which I shamelessly stole and modified instead of making my own
-
+Note that the `ThroughProp` must be the actual field name in the database, not the property name on the struct. If there is no `ThroughProp`, the data will be cascaded directly onto the root of the document.
