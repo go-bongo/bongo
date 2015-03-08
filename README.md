@@ -278,10 +278,7 @@ func (c *Child) GetCascade(collection *bongo.Collection) []*bongo.CascadeConfig 
 	cascadeSingle := &bongo.CascadeConfig{
 		Collection:  connection.Collection("parents").Collection(),
 		Properties:  []string{"name"},
-		Rel:rel,
-		Data:map[string]interface{
-			"name":c.Name,
-		},
+		Data:rel,
 		ThroughProp: "child",
 		RelType:     bongo.REL_ONE,
 		Query: bson.M{
@@ -292,10 +289,7 @@ func (c *Child) GetCascade(collection *bongo.Collection) []*bongo.CascadeConfig 
 	cascadeMulti := &bongo.CascadeConfig{
 		Collection:  connection.Collection("parents").Collection(),
 		Properties:  []string{"name"},
-		Rel:rel,
-		Data:map[string]interface{
-			"name":c.Name,
-		},
+		Data:rel,
 		ThroughProp: "children",
 		RelType:     bongo.REL_MANY,
 		Query: bson.M{
