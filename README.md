@@ -1,7 +1,7 @@
 # What's Bongo?
 We couldn't find a good ODM for MongoDB written in Go, so we made one. Bongo is a wrapper for mgo (https://github.com/go-mgo/mgo) that adds ODM, hooks, validation, and cascade support to its raw Mongo functions.
 
-Bongo is tested using the fantasic GoConvey (github.com/smartystreets/goconvey)
+Bongo is tested using the fantasic GoConvey (https://github.com/smartystreets/goconvey)
 
 # Usage
 
@@ -230,8 +230,6 @@ If you are going to be checking more than one field, you should instantiate a ne
 Bongo supports cascading portions of documents to related documents and the subsequent cleanup upon deletion. For example, if you have a `Team` collection, and each team has an array of `Players`, you can cascade a player's first name and last name to his or her `team.Players` array on save, and remove that element in the array if you delete the player.
 
 To use this feature, your struct needs to have an exported method called `GetCascade`, which returns an array of `*bongo.CascadeConfig`. Additionally, if you want to make use of the `OldQuery` property to remove references from previously related documents, you should probably alsotimplement the `DiffTracker` on your model struct (see above). 
-
-On the struct properties that are cascaded from related documents, you need to tell Mongo not to save them, and how to decrypt them. (The related collection could have a different encryption key). To do this, use the `cascadedFrom={collectionName}` bongo tag, like so `bongo:"cascadedFrom=children"`. This will tell Bongo not to save those fields when you save your model (since they are supposed to be populated by the related documents), and also to decrypt those fields using the encryption key for the "children" collection, rather than the main model's collection.
 
 You can also leave `ThroughProp` blank, in which case the properties of the document will be cascaded directly onto the related document. This is useful when you want to cascade `ObjectId` properties or other references, but it is important that you keep in mind that (a) these properties will be nullified on the related document when the main doc is deleted or changes references, and (b) they will fail decryption if you have encryption keys per collection, because currently there is no way to designate that property is cascaded from another collection unless it is a struct or slice of structs.
 
