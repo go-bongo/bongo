@@ -27,19 +27,34 @@ func NewDiffTracker(doc interface{}) *DiffTracker {
 	return c
 }
 
-func (c *DiffTracker) Reset() {
-	// Store a copy of current
-	c.original = reflect.Indirect(reflect.ValueOf(c.current)).Interface()
+type DiffTrackingSession struct {
+	ChangedFields []string
+	IsNew         bool
 }
 
-func (c *DiffTracker) Modified(field string) bool {
-	isNew, diffs, _ := c.Compare(false)
+func (d *DiffTracker) NewSession(useBsonTags bool) (*DiffTrackingSession, error) {
+	sess := &DiffTrackingSession{}
 
-	if isNew {
+	isNew, changedFields, err := d.Compare(useBsonTags)
+
+	sess.IsNew = isNew
+	sess.ChangedFields = changedFields
+
+	return sess, err
+}
+
+func (d *DiffTracker) Reset() {
+	// Store a copy of current
+	d.original = reflect.Indirect(reflect.ValueOf(d.current)).Interface()
+}
+
+func (s *DiffTrackingSession) Modified(field string) bool {
+
+	if s.IsNew {
 		return true
 	} else {
 
-		for _, d := range diffs {
+		for _, d := range s.ChangedFields {
 			if d == field || strings.HasPrefix(d, field+".") {
 				return true
 			}
@@ -48,25 +63,29 @@ func (c *DiffTracker) Modified(field string) bool {
 	}
 }
 
-func (c *DiffTracker) GetModified(useBson bool) (bool, []string) {
-	isNew, diffs, _ := c.Compare(useBson)
+func (d *DiffTracker) Modified(field string) bool {
+	sess, _ := d.NewSession(false)
+	return sess.Modified(field)
+}
+
+func (d *DiffTracker) GetModified(useBson bool) (bool, []string) {
+	isNew, diffs, _ := d.Compare(useBson)
 
 	return isNew, diffs
 }
-
-func (c *DiffTracker) GetOriginalValue(field string) (interface{}, error) {
-	if c.original != nil {
-		return dotaccess.Get(c.original, field)
+func (d *DiffTracker) GetOriginalValue(field string) (interface{}, error) {
+	if d.original != nil {
+		return dotaccess.Get(d.original, field)
 	}
 	return nil, nil
 
 }
 
-func (c *DiffTracker) Clear() {
-	c.original = nil
+func (d *DiffTracker) Clear() {
+	d.original = nil
 }
 
-func (c *DiffTracker) Compare(useBson bool) (bool, []string, error) {
+func (d *DiffTracker) Compare(useBson bool) (bool, []string, error) {
 	defer func() {
 
 		if r := recover(); r != nil {
@@ -74,8 +93,8 @@ func (c *DiffTracker) Compare(useBson bool) (bool, []string, error) {
 			panic(r)
 		}
 	}()
-	if c.original != nil {
-		diffs, err := getChangedFields(c.original, c.current, useBson)
+	if d.original != nil {
+		diffs, err := getChangedFields(d.original, d.current, useBson)
 		return false, diffs, err
 	} else {
 		return true, []string{}, nil

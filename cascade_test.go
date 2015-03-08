@@ -251,4 +251,29 @@ func TestCascade(t *testing.T) {
 		So(len(newParent4.Children), ShouldEqual, 0)
 
 	})
+
+	Convey("MapFromCascadeProperties", t, func() {
+		parent := &Parent{
+			Bar: "bar",
+			Child: ChildRef{
+				Name: "child",
+				SubChild: SubChildRef{
+					Foo: "foo",
+				},
+			},
+			Number: 5,
+		}
+
+		props := []string{"bar", "child.name"}
+
+		mp := MapFromCascadeProperties(props, parent)
+
+		So(len(mp), ShouldEqual, 2)
+		So(mp["bar"], ShouldEqual, "bar")
+
+		submp := mp["child"].(map[string]interface{})
+		So(submp["name"], ShouldEqual, "child")
+
+	})
+
 }

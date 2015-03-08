@@ -84,9 +84,14 @@ func TestDiffTracker(t *testing.T) {
 			}
 
 			foo1.GetDiffTracker().Reset()
-			So(foo1.diffTracker.Modified("StringVal"), ShouldEqual, false)
+
+			sess, _ := foo1.GetDiffTracker().NewSession(false)
+
+			So(sess.Modified("StringVal"), ShouldEqual, false)
 			foo1.StringVal = "bar"
-			So(foo1.diffTracker.Modified("StringVal"), ShouldEqual, true)
+
+			sess, _ = foo1.GetDiffTracker().NewSession(false)
+			So(sess.Modified("StringVal"), ShouldEqual, true)
 		})
 	})
 

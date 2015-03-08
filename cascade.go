@@ -2,9 +2,11 @@ package bongo
 
 import (
 	"errors"
+	"github.com/maxwellhealth/go-dotaccess"
 	"github.com/oleiade/reflections"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
+	"strings"
 )
 
 // Relation types (one-to-many or one-to-one)
@@ -223,4 +225,51 @@ func cascadeSaveWithConfig(conf *CascadeConfig, doc Document) (*mgo.ChangeInfo, 
 
 	return &mgo.ChangeInfo{}, errors.New("Invalid relation type")
 
+}
+
+// If you need to, you can use this to construct the data map that will be cascaded down to
+// related documents. Doing this is not recommended unless the cascaded fields are dynamic.
+func MapFromCascadeProperties(properties []string, doc Document) map[string]interface{} {
+	data := make(map[string]interface{})
+
+	for _, prop := range properties {
+		split := strings.Split(prop, ".")
+
+		if len(split) == 1 {
+			data[prop], _ = dotaccess.Get(doc, prop)
+		} else {
+			actualProp := split[len(split)-1]
+			split := append([]string{}, split[:len(split)-1]...)
+			curData := data
+
+			for _, s := range split {
+				if _, ok := curData[s]; ok {
+					if mapped, ok := curData[s].(map[string]interface{}); ok {
+						curData = mapped
+					} else {
+						panic("Cannot access non-map property via dot notation")
+					}
+
+				} else {
+					curData[s] = make(map[string]interface{})
+					if mapped, ok := curData[s].(map[string]interface{}); ok {
+						curData = mapped
+					} else {
+						panic("Cannot access non-map property via dot notation")
+					}
+				}
+			}
+
+			val, _ := dotaccess.Get(doc, prop)
+			// if bsonId, ok := val.(bson.ObjectId); ok {
+			// 	if !bsonId.Valid() {
+			// 		curData[actualProp] = ""
+			// 		continue
+			// 	}
+			// }
+			curData[actualProp] = val
+		}
+	}
+
+	return data
 }

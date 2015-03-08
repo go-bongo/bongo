@@ -3,12 +3,9 @@ package bongo
 import (
 	"errors"
 	// "fmt"
-
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
-	// "github.com/oleiade/reflections"
 	"time"
-	// "reflect"
 	// "math"
 	// "strings"
 )
@@ -132,7 +129,7 @@ func (c *Collection) Save(doc Document) error {
 		return errors.New("New tracker says this document isn't new but there is no valid Id field")
 	}
 
-	if isNew {
+	if isNew && !id.Valid() {
 		// Generate an Id
 		id = bson.NewObjectId()
 		doc.SetId(id)
