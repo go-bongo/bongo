@@ -121,7 +121,7 @@ The error returned can be a `DocumentNotFoundError` or a more low-level MongoDB 
 
 ```go
 if dnfError, ok := err.(*bongo.DocumentNotFoundError); ok {
-	fmt.Println("document not found"")
+	fmt.Println("document not found")
 } else {
 	fmt.Println("real error " + err.Error())
 }
@@ -220,6 +220,9 @@ isNew, modifiedFields = myModel.GetModified()
 fmt.Println(isNew, modifiedFields) // false, []
 ```
 
+### Diff-tracking Session
+If you are going to be checking more than one field, you should instantiate a new `DiffTrackingSession` with `diffTracker.NewSession(useBsonTags bool)`. This will load the changed fields into the session. Otherwise with each call to `diffTracker.Modified()`, it will have to recalculate the changed fields.
+
 
 ## Cascade Save/Delete
 Bongo supports cascading portions of documents to related documents and the subsequent cleanup upon deletion. For example, if you have a `Team` collection, and each team has an array of `Players`, you can cascade a player's first name and last name to his or her `team.Players` array on save, and remove that element in the array if you delete the player.
@@ -274,6 +277,9 @@ func (c *Child) GetCascade(collection *bongo.Collection) []*bongo.CascadeConfig 
 		Collection:  connection.Collection("parents").Collection(),
 		Properties:  []string{"name"},
 		Rel:rel,
+		Data:map[string]interface{
+			"name":c.Name,
+		},
 		ThroughProp: "child",
 		RelType:     bongo.REL_ONE,
 		Query: bson.M{
@@ -285,6 +291,9 @@ func (c *Child) GetCascade(collection *bongo.Collection) []*bongo.CascadeConfig 
 		Collection:  connection.Collection("parents").Collection(),
 		Properties:  []string{"name"},
 		Rel:rel,
+		Data:map[string]interface{
+			"name":c.Name,
+		},
 		ThroughProp: "children",
 		RelType:     bongo.REL_MANY,
 		Query: bson.M{
@@ -319,4 +328,4 @@ This does the following:
 
 4) When you delete a child, it will also use `cascadeMulti.OldQuery` to remove the reference from its previous `parent.children`
 
-Note that the `ThroughProp` must be the actual field name in the database, not the property name on the struct. If there is no `ThroughProp`, the data will be cascaded directly onto the root of the document.
+Note that the `ThroughProp` must be the actual field name in the database (bson tag), not the property name on the struct. If there is no `ThroughProp`, the data will be cascaded directly onto the root of the document.
