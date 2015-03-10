@@ -314,12 +314,12 @@ func (c *Child) GetCascade(collection *bongo.Collection) []*bongo.CascadeConfig 
 
 This does the following:
 
-1) When you save a child, it will populate its parent's (defined by `cascadeSingle.Query`) `child` property with an object, consisting of one key/value pair (`name`)
+1. When you save a child, it will populate its parent's (defined by `cascadeSingle.Query`) `child` property with an object, consisting of one key/value pair (`name`)
 
-2) When you save a child, it will also modify its parent's (defined by `cascadeMulti.Query`) `children` array, either modifying or pushing to the array of key/value pairs, also with just `name`.
+2. When you save a child, it will also modify its parent's (defined by `cascadeMulti.Query`) `children` array, either modifying or pushing to the array of key/value pairs, also with just `name`.
 
-3) When you delete a child, it will use `cascadeSingle.OldQuery` to remove the reference from its previous `parent.child`
+3. When you delete a child, it will use `cascadeSingle.OldQuery` to remove the reference from its previous `parent.child`
 
-4) When you delete a child, it will also use `cascadeMulti.OldQuery` to remove the reference from its previous `parent.children`
+4. When you delete a child, it will also use `cascadeMulti.OldQuery` to remove the reference from its previous `parent.children`
 
 Note that the `ThroughProp` must be the actual field name in the database (bson tag), not the property name on the struct. If there is no `ThroughProp`, the data will be cascaded directly onto the root of the document.
