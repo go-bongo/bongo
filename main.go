@@ -3,7 +3,7 @@ package bongo
 import (
 	"errors"
 	"fmt"
-	"labix.org/v2/mgo"
+	"gopkg.in/mgo.v2"
 )
 
 type Config struct {
