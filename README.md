@@ -3,6 +3,19 @@ We couldn't find a good ODM for MongoDB written in Go, so we made one. Bongo is 
 
 Bongo is tested using the fantasic GoConvey (https://github.com/smartystreets/goconvey)
 
+# Stablity
+
+Since we're not yet at a major release, some things in the API might change. Here's a list:
+
+* Save - stable
+* Find/FindOne/FindById - stable
+* Delete - unstable. See issue #3
+* Save/Delete/Find hooks - stable
+* Validation hook - unstable (might move return val from []string to []error)
+* Cascade - unstable (might need a refactor)
+* Change Tracking - stable
+* Validation methods - stable
+
 # Usage
 
 ## Basic Usage
