@@ -5,6 +5,8 @@ Bongo is tested using the fantasic GoConvey (https://github.com/smartystreets/go
 
 [![Build Status](https://travis-ci.org/maxwellhealth/bongo.svg)](https://travis-ci.org/maxwellhealth/bongo)
 
+[![Coverage Status](https://coveralls.io/repos/maxwellhealth/bongo/badge.svg)](https://coveralls.io/r/maxwellhealth/bongo)
+
 # Stablity
 
 Since we're not yet at a major release, some things in the API might change. Here's a list:
