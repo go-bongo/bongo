@@ -1,0 +1,8 @@
+language: go
+
+go:
+  - 1.4.2
+  - tip
+install:
+  - go get .
+  - go get github.com/smartystreets/goconvey
