@@ -239,7 +239,7 @@ func TestCascade(t *testing.T) {
 		So(newParent3.Child.SubChild.Id.Hex(), ShouldEqual, subChild.Id.Hex())
 
 		newParent4 := &Parent{}
-		err = childCollection.Delete(child)
+		err = childCollection.DeleteDocument(child)
 
 		// Wait a sec for the go routine to finish.
 		time.Sleep(100 * time.Millisecond)

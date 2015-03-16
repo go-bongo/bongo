@@ -13,9 +13,8 @@ Since we're not yet at a major release, some things in the API might change. Her
 
 * Save - stable
 * Find/FindOne/FindById - stable
-* Delete - unstable. See issue #3
-* Save/Delete/Find hooks - stable
-* Validation hook - unstable (might move return val from []string to []error)
+* Delete - stable
+* Save/Delete/Find/Validation hooks - stable
 * Cascade - unstable (might need a refactor)
 * Change Tracking - stable
 * Validation methods - stable
@@ -58,7 +57,6 @@ Any struct can be used as a document as long as it satisfies the `Document` inte
 For example:
 
 ```go
-
 type Person struct {
 	bongo.DocumentBase `bson:",inline"`
 	FirstName string
@@ -70,8 +68,6 @@ type Person struct {
 You can use child structs as well.
 
 ```go
-
-
 type Person struct {
 	bongo.DocumentBase `bson:",inline"`
 	FirstName string
@@ -91,7 +87,7 @@ type Person struct {
 
 You can add special methods to your document type that will automatically get called by bongo during certain actions. Hooks get passed the current `*bongo.Collection` so you can avoid having to couple them with your actual database layer. Currently available hooks are:
 
-* `func (s *ModelStruct) Validate(*bongo.Collection) []string` (returns a slice of errors - if it is empty then it is assumed that validation succeeded)
+* `func (s *ModelStruct) Validate(*bongo.Collection) []error` (returns a slice of errors - if it is empty then it is assumed that validation succeeded)
 * `func (s *ModelStruct) BeforeSave(*bongo.Collection) error`
 * `func (s *ModelStruct) AfterSave(*bongo.Collection) error`
 * `func (s *ModelStruct) BeforeDelete(*bongo.Collection) error`
@@ -123,9 +119,28 @@ if vErr, ok := err.(*bongo.ValidationError); ok {
 
 ### Deleting Documents
 
-Same thing as `Save` - just call `Delete` on the collection and pass the document instance.
+There are three ways to delete a document.
+
+#### DeleteDocument
+Same thing as `Save` - just call `DeleteDocument` on the collection and pass the document instance.
 ```go
-err := connection.Collection("people").Delete(person)
+err := connection.Collection("people").DeleteDocument(person)
+```
+
+This *will* run the `BeforeDelete` and `AfterDelete` hooks, if applicable.
+
+#### DeleteOne
+This just delegates to `mgo.Collection.Remove`. It will *not* run the `BeforeDelete` and `AfterDelete` hooks.
+
+```go
+err := connection.Collection("people").DeleteOne(bson.M{"FirstName":"Testy"})
+```
+
+#### Delete
+This delegates to `mgo.Collection.RemoveAll`. It will *not* run the `BeforeDelete` and `AfterDelete` hooks.
+```go
+changeInfo, err := connection.Collection("people").Delete(bson.M{"FirstName":"Testy"})
+fmt.Printf("Deleted %d documents", changeInfo.Removed)
 ```
 
 

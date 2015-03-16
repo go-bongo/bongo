@@ -31,11 +31,11 @@ type AfterFindHook interface {
 }
 
 type ValidateHook interface {
-	Validate(*Collection) []string
+	Validate(*Collection) []error
 }
 
 type ValidationError struct {
-	Errors []string
+	Errors []error
 }
 
 type TimeTracker interface {
@@ -226,7 +226,7 @@ func (c *Collection) FindOne(query interface{}, doc interface{}) error {
 	return nil
 }
 
-func (c *Collection) Delete(doc Document) error {
+func (c *Collection) DeleteDocument(doc Document) error {
 	var err error
 	// Create a new session per mgo's suggestion to avoid blocking
 	sess := c.Connection.Session.Clone()
@@ -257,4 +257,20 @@ func (c *Collection) Delete(doc Document) error {
 
 	return nil
 
+}
+
+// Convenience method which just delegates to mgo. Note that hooks are NOT run
+func (c *Collection) Delete(query bson.M) (*mgo.ChangeInfo, error) {
+	sess := c.Connection.Session.Clone()
+	defer sess.Close()
+	col := c.collectionOnSession(sess)
+	return col.RemoveAll(query)
+}
+
+// Convenience method which just delegates to mgo. Note that hooks are NOT run
+func (c *Collection) DeleteOne(query bson.M) error {
+	sess := c.Connection.Session.Clone()
+	defer sess.Close()
+	col := c.collectionOnSession(sess)
+	return col.Remove(query)
 }

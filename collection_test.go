@@ -1,6 +1,7 @@
 package bongo
 
 import (
+	"errors"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"testing"
@@ -50,8 +51,8 @@ type validatedDocument struct {
 	Name         string
 }
 
-func (v *validatedDocument) Validate(c *Collection) []string {
-	return []string{"test validation error"}
+func (v *validatedDocument) Validate(c *Collection) []error {
+	return []error{errors.New("test validation error")}
 }
 
 func TestCollection(t *testing.T) {
@@ -88,7 +89,7 @@ func TestCollection(t *testing.T) {
 
 			v, ok := err.(*ValidationError)
 			So(ok, ShouldEqual, true)
-			So(v.Errors[0], ShouldEqual, "test validation error")
+			So(v.Errors[0].Error(), ShouldEqual, "test validation error")
 		})
 
 		Convey("should be able to save an existing document", func() {
@@ -197,7 +198,7 @@ func TestCollection(t *testing.T) {
 			err := conn.Collection("tests").Save(doc)
 			So(err, ShouldEqual, nil)
 
-			err = conn.Collection("tests").Delete(doc)
+			err = conn.Collection("tests").DeleteDocument(doc)
 			So(err, ShouldEqual, nil)
 
 			count, err := conn.Collection("tests").Collection().Count()
@@ -212,7 +213,7 @@ func TestCollection(t *testing.T) {
 			err := conn.Collection("tests").Save(doc)
 			So(err, ShouldEqual, nil)
 
-			err = conn.Collection("tests").Delete(doc)
+			err = conn.Collection("tests").DeleteDocument(doc)
 			So(err, ShouldEqual, nil)
 
 			count, err := conn.Collection("tests").Collection().Count()
@@ -223,5 +224,41 @@ func TestCollection(t *testing.T) {
 			So(doc.RanBeforeDelete, ShouldEqual, true)
 			So(doc.RanAfterDelete, ShouldEqual, true)
 		})
+
+		Convey("should be able delete a document with DeleteOne", func() {
+			doc := &noHookDocument{}
+
+			err := conn.Collection("tests").Save(doc)
+			So(err, ShouldEqual, nil)
+
+			err = conn.Collection("tests").DeleteOne(bson.M{
+				"_id": doc.Id,
+			})
+			So(err, ShouldEqual, nil)
+
+			count, err := conn.Collection("tests").Collection().Count()
+
+			So(err, ShouldEqual, nil)
+			So(count, ShouldEqual, 0)
+		})
+
+		Convey("should be able delete a document with Delete", func() {
+			doc := &noHookDocument{}
+
+			err := conn.Collection("tests").Save(doc)
+			So(err, ShouldEqual, nil)
+
+			info, err := conn.Collection("tests").Delete(bson.M{
+				"_id": doc.Id,
+			})
+			So(err, ShouldEqual, nil)
+			So(info.Removed, ShouldEqual, 1)
+
+			count, err := conn.Collection("tests").Collection().Count()
+
+			So(err, ShouldEqual, nil)
+			So(count, ShouldEqual, 0)
+		})
+
 	})
 }
