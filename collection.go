@@ -80,14 +80,7 @@ func (c *Collection) collectionOnSession(sess *mgo.Session) *mgo.Collection {
 	return sess.DB(c.Connection.Config.Database).C(c.Name)
 }
 
-func (c *Collection) Save(doc Document) error {
-	var err error
-	sess := c.Connection.Session.Clone()
-	defer sess.Close()
-
-	// Per mgo's recommendation, create a clone of the session so there is no blocking
-	col := c.collectionOnSession(sess)
-
+func (c *Collection) PreSave(doc Document) error {
 	// Validate?
 	if validator, ok := doc.(ValidateHook); ok {
 		errs := validator.Validate(c)
@@ -104,6 +97,21 @@ func (c *Collection) Save(doc Document) error {
 		}
 	}
 
+	return nil
+}
+
+func (c *Collection) Save(doc Document) error {
+	var err error
+	sess := c.Connection.Session.Clone()
+	defer sess.Close()
+
+	// Per mgo's recommendation, create a clone of the session so there is no blocking
+	col := c.collectionOnSession(sess)
+
+	err = c.PreSave(doc)
+	if err != nil {
+		return err
+	}
 	// If the model implements the NewTracker interface, we'll use that to determine newness. Otherwise always assume it's new
 
 	isNew := true
