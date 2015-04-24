@@ -44,7 +44,7 @@ func TestDiffTracker(t *testing.T) {
 				Arr:       []string{},
 			}
 
-			diffs, err := getChangedFields(foo1, foo2, false)
+			diffs, err := GetChangedFields(foo1, foo2, false)
 			So(err, ShouldEqual, nil)
 			So(len(diffs), ShouldEqual, 2)
 			So(diffs[0], ShouldEqual, "StringVal")
@@ -69,7 +69,7 @@ func TestDiffTracker(t *testing.T) {
 				BarVal: "BAR",
 			}
 
-			diffs, err := getChangedFields(foobar1, foobar2, false)
+			diffs, err := GetChangedFields(foobar1, foobar2, false)
 			So(err, ShouldEqual, nil)
 			So(len(diffs), ShouldEqual, 3)
 			So(diffs[0], ShouldEqual, "FooVal.IntVal")

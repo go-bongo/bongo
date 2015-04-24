@@ -94,7 +94,7 @@ func (d *DiffTracker) Compare(useBson bool) (bool, []string, error) {
 		}
 	}()
 	if d.original != nil {
-		diffs, err := getChangedFields(d.original, d.current, useBson)
+		diffs, err := GetChangedFields(d.original, d.current, useBson)
 		return false, diffs, err
 	} else {
 		return true, []string{}, nil
@@ -124,7 +124,7 @@ func isNilOrInvalid(f reflect.Value) bool {
 	return (!f.IsValid())
 }
 
-func getChangedFields(struct1 interface{}, struct2 interface{}, useBson bool) ([]string, error) {
+func GetChangedFields(struct1 interface{}, struct2 interface{}, useBson bool) ([]string, error) {
 
 	diffs := make([]string, 0)
 	val1 := reflect.ValueOf(struct1)
@@ -200,7 +200,7 @@ func getChangedFields(struct1 interface{}, struct2 interface{}, useBson bool) ([
 						diffs = append(diffs, fieldName)
 					}
 				} else {
-					childDiffs, err = getChangedFields(field1.Interface(), field2.Interface(), useBson)
+					childDiffs, err = GetChangedFields(field1.Interface(), field2.Interface(), useBson)
 
 					if err != nil {
 						return diffs, err

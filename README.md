@@ -212,9 +212,8 @@ type MyModel struct {
 
 // Easy way to lazy load a diff tracker
 func (m *MyModel) GetDiffTracker() *DiffTracker {
-	v := reflect.ValueOf(m.diffTracker)
-	if !v.IsValid() || v.IsNil() {
-		m.diffTracker = NewDiffTracker(m)
+	if m.diffTracker == nil {
+		m.diffTracker = bongo.NewDiffTracker(m)
 	}
 
 	return m.diffTracker
