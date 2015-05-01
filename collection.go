@@ -7,7 +7,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"time"
 	// "math"
-	// "strings"
+	"strings"
 )
 
 type BeforeSaveHook interface {
@@ -53,7 +53,12 @@ type CascadingDocument interface {
 }
 
 func (v *ValidationError) Error() string {
-	return "Validation failed"
+	errs := make([]string, len(v.Errors))
+
+	for i, e := range v.Errors {
+		errs[i] = e.Error()
+	}
+	return "Validation failed. (" + strings.Join(errs, ", ") + ")"
 }
 
 type Collection struct {

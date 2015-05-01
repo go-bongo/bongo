@@ -81,6 +81,10 @@ func (d *DiffTracker) GetOriginalValue(field string) (interface{}, error) {
 
 }
 
+func (d *DiffTracker) SetOriginal(orig interface{}) {
+	d.original = reflect.Indirect(reflect.ValueOf(orig)).Interface()
+}
+
 func (d *DiffTracker) Clear() {
 	d.original = nil
 }
@@ -221,8 +225,10 @@ func GetChangedFields(struct1 interface{}, struct2 interface{}, useBson bool) ([
 			}
 		} else {
 
+			// fmt.Println("Comparing ", fieldName, fmt.Sprint(field1.Interface()), fmt.Sprint(field2.Interface()))
 			if fmt.Sprint(field1.Interface()) != fmt.Sprint(field2.Interface()) {
 				diffs = append(diffs, fieldName)
+				// fmt.Println("Changed!")
 			}
 		}
 	}
