@@ -128,6 +128,10 @@ func isNilOrInvalid(f reflect.Value) bool {
 	return (!f.IsValid())
 }
 
+type Stringer interface {
+	String() string
+}
+
 func GetChangedFields(struct1 interface{}, struct2 interface{}, useBson bool) ([]string, error) {
 
 	diffs := make([]string, 0)
@@ -198,11 +202,11 @@ func GetChangedFields(struct1 interface{}, struct2 interface{}, useBson bool) ([
 				childDiffs = getFields(childType)
 
 			} else {
-				// Special for time.Time and bson.ObjectId
-				if strings.HasSuffix(childType.String(), "time.Time") || strings.HasSuffix(childType.String(), "bson.ObjectId") {
+				if _, ok := field1.Interface().(Stringer); ok {
 					if fmt.Sprint(field1.Interface()) != fmt.Sprint(field2.Interface()) {
 						diffs = append(diffs, fieldName)
 					}
+
 				} else {
 					childDiffs, err = GetChangedFields(field1.Interface(), field2.Interface(), useBson)
 
