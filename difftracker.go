@@ -195,9 +195,9 @@ func GetChangedFields(struct1 interface{}, struct2 interface{}, useBson bool) ([
 
 			var childDiffs []string
 			var err error
-			// Make sure they aren't zero-value
+			// Make sure they aren't zero-value. Skip if so
 			if isNilOrInvalid(field1) && isNilOrInvalid(field2) {
-				return diffs, nil
+				continue
 			} else if isNilOrInvalid(field1) || isNilOrInvalid(field2) {
 				childDiffs = getFields(childType)
 
@@ -229,10 +229,8 @@ func GetChangedFields(struct1 interface{}, struct2 interface{}, useBson bool) ([
 			}
 		} else {
 
-			// fmt.Println("Comparing ", fieldName, fmt.Sprint(field1.Interface()), fmt.Sprint(field2.Interface()))
 			if fmt.Sprint(field1.Interface()) != fmt.Sprint(field2.Interface()) {
 				diffs = append(diffs, fieldName)
-				// fmt.Println("Changed!")
 			}
 		}
 	}

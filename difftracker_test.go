@@ -77,6 +77,21 @@ func TestDiffTracker(t *testing.T) {
 			So(diffs[2], ShouldEqual, "BarVal")
 		})
 
+		Convey("should get changed fields when comparing two structs with nil pointers", func() {
+			foobar1 := &FooBarChangeTest{
+				BarVal: "bar",
+			}
+
+			foobar2 := &FooBarChangeTest{
+				BarVal: "BAR",
+			}
+
+			diffs, err := GetChangedFields(foobar1, foobar2, false)
+			So(err, ShouldEqual, nil)
+			So(len(diffs), ShouldEqual, 1)
+			So(diffs[0], ShouldEqual, "BarVal")
+		})
+
 		Convey("should get fields modified since difftracker reset", func() {
 			foo1 := &FooChangeTest{
 				StringVal: "foo",
