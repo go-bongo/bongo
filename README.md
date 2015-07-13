@@ -42,10 +42,14 @@ config := &bongo.Config{
 }
 ```
 
-Then just create a new instance of `bongo.Connection`:
+Then just create a new instance of `bongo.Connection`, and make sure to handle any connection errors:
 
 ```go
-connection := bongo.Connect(config)
+connection, err := bongo.Connect(config)
+
+if err != nil {
+	log.Fatal(err)
+}
 ```
 
 If you need to, you can access the raw `mgo` session with `connection.Session`
