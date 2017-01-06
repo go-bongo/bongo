@@ -3,12 +3,14 @@ package bongo
 import (
 	"errors"
 	"fmt"
+
 	"gopkg.in/mgo.v2"
 )
 
 type Config struct {
 	ConnectionString string
 	Database         string
+	DialInfo         *mgo.DialInfo
 }
 
 // var EncryptionKey [32]byte
@@ -47,7 +49,14 @@ func (m *Connection) Connect() (err error) {
 
 		}
 	}()
-	session, err := mgo.Dial(m.Config.ConnectionString)
+
+	if m.Config.DialInfo == nil {
+		if m.Config.DialInfo, err = mgo.ParseURL(m.Config.ConnectionString); err != nil {
+			panic(fmt.Sprintf("cannot parse given URI %s due to error: %s", m.Config.ConnectionString, err.Error()))
+		}
+	}
+
+	session, err := mgo.DialWithInfo(m.Config.DialInfo)
 
 	if err != nil {
 		return err
@@ -56,6 +65,7 @@ func (m *Connection) Connect() (err error) {
 	m.Session = session
 
 	m.Session.SetMode(mgo.Monotonic, true)
+
 	return nil
 }
 
