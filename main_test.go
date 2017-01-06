@@ -1,8 +1,9 @@
 package bongo
 
 import (
-	. "github.com/smartystreets/goconvey/convey"
 	"testing"
+
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 // For test usage
@@ -19,6 +20,18 @@ func getConnection() *Connection {
 	}
 
 	return conn
+}
+
+func TestFailSSLConnec(t *testing.T) {
+	Convey("should fail to connect to a database because of unsupported ssl flag", t, func() {
+		conf := &Config{
+			ConnectionString: "mongodb://localhost?ssl=true",
+			Database:         "bongotest",
+		}
+
+		_, err := Connect(conf)
+		So(err.Error(), ShouldEqual, "cannot parse given URI mongodb://localhost?ssl=true due to error: unsupported connection URL option: ssl=true")
+	})
 }
 
 func TestConnect(t *testing.T) {
