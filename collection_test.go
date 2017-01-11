@@ -23,26 +23,31 @@ type hookedDocument struct {
 
 func (h *hookedDocument) BeforeSave(c *Collection) error {
 	h.RanBeforeSave = true
+	So(c.Context.Get("foo"), ShouldEqual, "bar")
 	return nil
 }
 
 func (h *hookedDocument) AfterSave(c *Collection) error {
 	h.RanAfterSave = true
+	So(c.Context.Get("foo"), ShouldEqual, "bar")
 	return nil
 }
 
 func (h *hookedDocument) BeforeDelete(c *Collection) error {
 	h.RanBeforeDelete = true
+	So(c.Context.Get("foo"), ShouldEqual, "bar")
 	return nil
 }
 
 func (h *hookedDocument) AfterDelete(c *Collection) error {
 	h.RanAfterDelete = true
+	So(c.Context.Get("foo"), ShouldEqual, "bar")
 	return nil
 }
 
 func (h *hookedDocument) AfterFind(c *Collection) error {
 	h.RanAfterFind = true
+	So(c.Context.Get("foo"), ShouldEqual, "bar")
 	return nil
 }
 

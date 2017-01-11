@@ -63,6 +63,8 @@ func (v *ValidationError) Error() string {
 
 type Collection struct {
 	Name       string
+	Database   string
+	Context    *Context
 	Connection *Connection
 }
 
@@ -77,12 +79,14 @@ func (d DocumentNotFoundError) Error() string {
 	return "Document not found"
 }
 
+// Collection ...
 func (c *Collection) Collection() *mgo.Collection {
-	return c.Connection.Session.DB(c.Connection.Config.Database).C(c.Name)
+	return c.Connection.Session.DB(c.Database).C(c.Name)
 }
 
+// CollectionOnSession ...
 func (c *Collection) collectionOnSession(sess *mgo.Session) *mgo.Collection {
-	return sess.DB(c.Connection.Config.Database).C(c.Name)
+	return sess.DB(c.Database).C(c.Name)
 }
 
 func (c *Collection) PreSave(doc Document) error {
