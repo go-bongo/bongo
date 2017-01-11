@@ -14,6 +14,7 @@ func getConnection() *Connection {
 	}
 
 	conn, err := Connect(conf)
+	conn.Context.Set("foo", "bar")
 
 	if err != nil {
 		panic(err)
@@ -44,6 +45,10 @@ func TestConnect(t *testing.T) {
 		conn, err := Connect(conf)
 		defer conn.Session.Close()
 		So(err, ShouldEqual, nil)
+
+		conn.Context.Set("foo", "bar")
+		value := conn.Context.Get("foo")
+		So(value, ShouldEqual, "bar")
 
 		err = conn.Session.Ping()
 		So(err, ShouldEqual, nil)

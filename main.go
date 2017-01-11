@@ -20,12 +20,14 @@ type Connection struct {
 	Config  *Config
 	Session *mgo.Session
 	// collection []Collection
+	Context *Context
 }
 
 // Create a new connection and run Connect()
 func Connect(config *Config) (*Connection, error) {
 	conn := &Connection{
-		Config: config,
+		Config:  config,
+		Context: &Context{},
 	}
 
 	err := conn.Connect()
@@ -75,5 +77,6 @@ func (m *Connection) Collection(name string) *Collection {
 	return &Collection{
 		Connection: m,
 		Name:       name,
+		Context:    m.Context,
 	}
 }

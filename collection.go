@@ -63,6 +63,7 @@ func (v *ValidationError) Error() string {
 
 type Collection struct {
 	Name       string
+	Context    *Context
 	Connection *Connection
 }
 
