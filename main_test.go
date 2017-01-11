@@ -59,9 +59,29 @@ func TestRetrieveCollection(t *testing.T) {
 	Convey("should be able to retrieve a collection instance from a connection", t, func() {
 		conn := getConnection()
 		defer conn.Session.Close()
-		col := conn.Collection("tests")
-
+		col := conn.Collection("tests");
 		So(col.Name, ShouldEqual, "tests")
 		So(col.Connection, ShouldEqual, conn)
+
+		So(col.Context.Get("foo"), ShouldEqual, "bar")
+
+		So(conn.Config.Database, ShouldEqual, col.Database)
+	})
+	Convey("should be able to retrieve a collection instance from a connection with different databases", t, func() {
+		conn := getConnection()
+		defer conn.Session.Close()
+
+		col1 := conn.CollectionFromDatabase("tests", "test1");
+		So(col1.Name, ShouldEqual, "tests")
+		So(col1.Connection, ShouldEqual, conn)
+		So(col1.Database, ShouldEqual, "test1")
+
+		col2 := conn.CollectionFromDatabase("tests", "test2");
+		So(col2.Name, ShouldEqual, "tests")
+		So(col2.Connection, ShouldEqual, conn)
+		So(col2.Database, ShouldEqual, "test2")
+
+		So(col2.Connection, ShouldEqual, col1.Connection)
+		So(col1.Database, ShouldNotEqual, col2.Database)
 	})
 }

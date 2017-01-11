@@ -59,7 +59,6 @@ func (m *Connection) Connect() (err error) {
 	}
 
 	session, err := mgo.DialWithInfo(m.Config.DialInfo)
-
 	if err != nil {
 		return err
 	}
@@ -71,12 +70,18 @@ func (m *Connection) Connect() (err error) {
 	return nil
 }
 
-func (m *Connection) Collection(name string) *Collection {
-
-	// Just create a new instance - it's cheap and only has name
+// CollectionFromDatabase ...
+func (m *Connection) CollectionFromDatabase(name string, database string) *Collection {
+	// Just create a new instance - it's cheap and only has name and a database name
 	return &Collection{
 		Connection: m,
-		Name:       name,
 		Context:    m.Context,
+		Database:   database,
+		Name:       name,
 	}
+}
+
+// Collection ...
+func (m *Connection) Collection(name string) *Collection {
+	return m.CollectionFromDatabase(name, m.Config.Database)
 }
