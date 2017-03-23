@@ -180,7 +180,7 @@ func (c *Collection) FindById(id bson.ObjectId, doc interface{}) error {
 	// Handle errors coming from mgo - we want to convert it to a DocumentNotFoundError so people can figure out
 	// what the error type is without looking at the text
 	if err != nil {
-		if err.Error() == "not found" {
+		if err == mgo.ErrNotFound {
 			return &DocumentNotFoundError{}
 		} else {
 			return err
