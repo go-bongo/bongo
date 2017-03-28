@@ -2,8 +2,10 @@ language: go
 services:
   - mongodb
 go:
-  - 1.4.2
-  - tip
+  - 1.4.x
+  - 1.8.x
+  - master
+    # NOTE: no tip, see https://github.com/travis-ci/gimme/issues/38
 install:
   - go get .
   - go get github.com/smartystreets/goconvey
