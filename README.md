@@ -56,7 +56,7 @@ If you need to, you can access the raw `mgo` session with `connection.Session`
 
 ### Create a Document
 
-Any struct can be used as a document as long as it satisfies the `Document` interface (`SetId(bson.ObjectId)`, `GetId() bson.ObjectId`). We recommend that you use the `DocumentBase` provided with Bongo, which implements that interface as well as the `NewTracker` and `TimeTracker` interfaces (to keep track of new/existing documents and created/modified timestamps). If you use the `DocumentBase` or something similar, make sure you use `bson:",inline"` otherwise you will get nested behavior when the data goes to your database.
+Any struct can be used as a document as long as it satisfies the `Document` interface (`SetId(bson.ObjectId)`, `GetId() bson.ObjectId`). We recommend that you use the `DocumentBase` provided with Bongo, which implements that interface as well as the `NewTracker`, `TimeCreatedTracker` and `TimeModifiedTracker` interfaces (to keep track of new/existing documents and created/modified timestamps). If you use the `DocumentBase` or something similar, make sure you use `bson:",inline"` otherwise you will get nested behavior when the data goes to your database.
 
 For example:
 

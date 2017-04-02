@@ -38,8 +38,11 @@ type ValidationError struct {
 	Errors []error
 }
 
-type TimeTracker interface {
+type TimeCreatedTracker interface {
 	SetCreated(time.Time)
+}
+
+type TimeModifiedTracker interface {
 	SetModified(time.Time)
 }
 
@@ -131,10 +134,11 @@ func (c *Collection) Save(doc Document) error {
 	// Add created/modified time. Also set on the model itself if it has those fields.
 	now := time.Now()
 
-	if tt, ok := doc.(TimeTracker); ok {
-		if isNew {
-			tt.SetCreated(now)
-		}
+	if tt, ok := doc.(TimeCreatedTracker); ok && isNew {
+		tt.SetCreated(now)
+	}
+
+	if tt, ok := doc.(TimeModifiedTracker); ok {
 		tt.SetModified(now)
 	}
 
