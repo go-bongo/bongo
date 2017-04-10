@@ -195,7 +195,7 @@ Same as find, but it will populate the reference of the struct you provide as th
 
 person := &Person{}
 
-err := connection.Collection("people").FindOne(bson.M{"firstName":"Bob"})
+err := connection.Collection("people").FindOne(bson.M{"firstName":"Bob"}, person)
 
 if err != nil {
 	fmt.Println(err.Error())
