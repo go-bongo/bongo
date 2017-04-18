@@ -3,9 +3,9 @@ We couldn't find a good ODM for MongoDB written in Go, so we made one. Bongo is 
 
 Bongo is tested using the fantasic GoConvey (https://github.com/smartystreets/goconvey)
 
-[![Build Status](https://travis-ci.org/maxwellhealth/bongo.svg)](https://travis-ci.org/maxwellhealth/bongo)
+[![Build Status](https://travis-ci.org/go-bongo/bongo.svg)](https://travis-ci.org/go-bongo/bongo)
 
-[![Coverage Status](https://coveralls.io/repos/maxwellhealth/bongo/badge.svg)](https://coveralls.io/r/maxwellhealth/bongo)
+[![Coverage Status](https://coveralls.io/repos/go-bongo/bongo/badge.svg)](https://coveralls.io/r/go-bongo/bongo)
 
 # Stablity
 
@@ -23,13 +23,13 @@ Since we're not yet at a major release, some things in the API might change. Her
 
 ## Basic Usage
 ### Import the Library
-`go get github.com/maxwellhealth/bongo`
+`go get github.com/go-bongo/bongo`
 
-`import "github.com/maxwellhealth/bongo"`
+`import "github.com/go-bongo/bongo"`
 
 And install dependencies:
 
-`cd $GOHOME/src/github.com/maxwellhealth/bongo && go get .`
+`cd $GOHOME/src/github.com/go-bongo/bongo && go get .`
 
 ### Connect to a Database
 
