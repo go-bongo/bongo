@@ -3,8 +3,8 @@ package bongo
 import (
 	"errors"
 	"fmt"
-	"github.com/maxwellhealth/go-dotaccess"
-	// "github.com/maxwellhealth/mgo/bson"
+	"github.com/go-bongo/go-dotaccess"
+	// "github.com/go-bongo/mgo/bson"
 	"reflect"
 	"strings"
 )
