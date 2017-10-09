@@ -36,6 +36,14 @@ func (d *DocumentBase) SetCreated(t time.Time) {
 	d.Created = t
 }
 
+func (d *DocumentBase) GetCreated() time.Time {
+	return d.Created
+}
+
 func (d *DocumentBase) SetModified(t time.Time) {
 	d.Modified = t
+}
+
+func (d *DocumentBase) GetModified() time.Time {
+	return d.Modified
 }
