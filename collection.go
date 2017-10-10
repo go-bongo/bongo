@@ -39,10 +39,12 @@ type ValidationError struct {
 }
 
 type TimeCreatedTracker interface {
+	GetCreated() time.Time
 	SetCreated(time.Time)
 }
 
 type TimeModifiedTracker interface {
+	GetModified() time.Time
 	SetModified(time.Time)
 }
 
