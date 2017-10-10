@@ -5,6 +5,7 @@ go:
   - 1.4.x
   - 1.7.x
   - 1.8.x
+  - 1.9.x
 install:
   - go get .
   - go get github.com/smartystreets/goconvey
