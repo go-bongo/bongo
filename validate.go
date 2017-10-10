@@ -13,14 +13,11 @@ func ValidateRequired(val interface{}) bool {
 func ValidateMongoIdRef(id bson.ObjectId, collection *Collection) bool {
 	count, err := collection.Collection().Find(bson.M{"_id": id}).Count()
 
-	if err != nil {
+	if err != nil || count <= 0 {
 		return false
 	}
 
-	if count > 0 {
-		return true
-	}
-	return false
+	return true
 }
 
 func stringInSlice(a string, list []string) bool {
