@@ -4,8 +4,8 @@ import (
 	"errors"
 	"github.com/go-bongo/go-dotaccess"
 	"github.com/oleiade/reflections"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/globalsign/mgo"
+	"github.com/globalsign/mgo/bson"
 	"strings"
 )
 

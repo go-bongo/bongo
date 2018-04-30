@@ -3,8 +3,8 @@ package bongo
 import (
 	"errors"
 	// "fmt"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/globalsign/mgo"
+	"github.com/globalsign/mgo/bson"
 	"time"
 	// "math"
 	"strings"
